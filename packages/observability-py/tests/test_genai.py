@@ -3,14 +3,47 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Protocol
 
 import pytest
-from conftest import OtelHarness
+from opentelemetry import metrics, trace
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
 
 from flownote_observability.config import ObservabilityConfig
 from flownote_observability.genai import GenAIInstrumentation
+
+
+class OtelHarness(Protocol):
+    """conftest の ``otel_env`` フィクスチャが返す観測ハーネスの構造的型。
+
+    Attributes:
+        spans: 終了済み span を保持するエクスポータ。
+        reader: メトリクスを読み出すリーダ。
+        tracer: ローカルプロバイダ由来のトレーサ。
+        meter: ローカルプロバイダ由来のメータ。
+    """
+
+    spans: InMemorySpanExporter
+    reader: InMemoryMetricReader
+    tracer: trace.Tracer
+    meter: metrics.Meter
+
+
+def _make_instrumentation(otel_env: OtelHarness, **config_kwargs: object) -> GenAIInstrumentation:
+    """ハーネスのローカル tracer/meter を注入した計装を生成する。
+
+    Args:
+        otel_env: OTel ハーネス。
+        **config_kwargs: :class:`ObservabilityConfig` への追加引数。
+
+    Returns:
+        テスト用に構成した計装。
+    """
+    config = ObservabilityConfig(service_name="t", console_export=False, **config_kwargs)  # type: ignore[arg-type]
+    return GenAIInstrumentation(config=config, tracer=otel_env.tracer, meter=otel_env.meter)
 
 
 @dataclass(slots=True)
@@ -39,7 +72,7 @@ def _find_span(harness: OtelHarness, name: str) -> ReadableSpan:
 
 
 def test_genai_span_has_required_attributes(otel_env: OtelHarness) -> None:
-    inst = GenAIInstrumentation(config=ObservabilityConfig(service_name="t", console_export=False))
+    inst = _make_instrumentation(otel_env)
     with inst.call(
         operation="chat", system="openai", request_model="qwen2.5", use_case="task_consult"
     ) as call:
@@ -58,7 +91,7 @@ def test_genai_span_has_required_attributes(otel_env: OtelHarness) -> None:
 
 
 def test_genai_records_token_metrics(otel_env: OtelHarness) -> None:
-    inst = GenAIInstrumentation(config=ObservabilityConfig(service_name="t", console_export=False))
+    inst = _make_instrumentation(otel_env)
     with inst.call(
         operation="chat", system="openai", request_model="m", use_case="unified_search"
     ) as call:
@@ -76,10 +109,13 @@ def test_genai_records_token_metrics(otel_env: OtelHarness) -> None:
 
 
 def test_genai_error_sets_status_and_type(otel_env: OtelHarness) -> None:
-    inst = GenAIInstrumentation(config=ObservabilityConfig(service_name="t", console_export=False))
-    with pytest.raises(ValueError), inst.call(
-        operation="chat", system="openai", request_model="err-model", use_case="uc"
-    ) as call:
+    inst = _make_instrumentation(otel_env)
+    with (
+        pytest.raises(ValueError),
+        inst.call(
+            operation="chat", system="openai", request_model="err-model", use_case="uc"
+        ) as call,
+    ):
         call.record_usage(input_tokens=1, output_tokens=0)
         raise ValueError("boom")
 
@@ -94,6 +130,8 @@ def test_prompt_content_not_logged_by_default(otel_env: OtelHarness) -> None:
     inst = GenAIInstrumentation(
         config=ObservabilityConfig(service_name="t", console_export=False),
         logger=fake,  # type: ignore[arg-type]
+        tracer=otel_env.tracer,
+        meter=otel_env.meter,
     )
     with inst.call(operation="chat", system="openai", request_model="m", use_case="uc") as call:
         call.capture("prompt", "secret content sk-abcdef1234567890")
@@ -111,6 +149,8 @@ def test_prompt_content_masked_when_enabled(otel_env: OtelHarness) -> None:
             genai_content_max_chars=500,
         ),
         logger=fake,  # type: ignore[arg-type]
+        tracer=otel_env.tracer,
+        meter=otel_env.meter,
     )
     with inst.call(operation="chat", system="openai", request_model="m", use_case="uc") as call:
         call.capture("prompt", "contact alice@example.com now")

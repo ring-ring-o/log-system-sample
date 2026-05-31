@@ -61,6 +61,16 @@ ignore = [
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "parents"
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI の DI は引数デフォルトでの関数呼び出しが正規の用法のため許容する。
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "flownote_api.interface.security.auth.require_permission",
+]
+
 [tool.mypy]
 python_version = "3.14"
 strict = true

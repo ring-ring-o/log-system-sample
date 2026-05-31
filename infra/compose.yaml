@@ -42,7 +42,6 @@ services:
     volumes:
       - ./otel-collector/config.yaml:/etc/otel/config.yaml:ro
       - ./volumes/otel-output:/var/log/otel
-      - ./volumes/flownote-logs:/var/log/flownote:ro
 
   ai-mock:
     build:

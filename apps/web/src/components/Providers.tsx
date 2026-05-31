@@ -7,7 +7,11 @@
  * ([frontend-logging](../../../../docs/observability/frontend-logging.md))。
  */
 
-import { registerGlobalErrorHandlers, reportWebVitals } from "@flownote/observability-web";
+import {
+  registerGlobalErrorHandlers,
+  reportWebVitals,
+  startPageTrace,
+} from "@flownote/observability-web";
 import { SessionProvider } from "next-auth/react";
 import { type ReactNode, useEffect } from "react";
 
@@ -21,6 +25,8 @@ import { getClientLogger } from "@/shared/observability";
  */
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
+    // ページ単位のルートトレースを開始し、以降のログ・fetch を同一 trace に束ねる。
+    startPageTrace();
     const logger = getClientLogger();
     reportWebVitals(logger);
     logger.info("web.app.mounted");

@@ -16,5 +16,10 @@ import { useSession } from "next-auth/react";
  */
 export function useToken(): string | undefined {
   const { data } = useSession();
-  return data?.accessToken ?? process.env.NEXT_PUBLIC_DEV_TOKEN;
+  if (data?.accessToken) return data.accessToken;
+  // dev トークンのフォールバックは本番ビルドでは無効化する(バンドルへの秘密焼き込み防止)。
+  if (process.env.NODE_ENV !== "production") {
+    return process.env.NEXT_PUBLIC_DEV_TOKEN;
+  }
+  return undefined;
 }

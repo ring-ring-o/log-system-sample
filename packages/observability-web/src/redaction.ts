@@ -18,6 +18,7 @@ const SENSITIVE_KEY_PARTS: readonly string[] = [
   "apikey",
   "client_secret",
   "cookie",
+  "private_key",
   "credential",
   "session",
   "otp",

@@ -43,6 +43,19 @@ describe("redact", () => {
     expect(result.note).toContain("***@***");
   });
 
+  it("redaction-policy §3.1 の必須キーを網羅する", () => {
+    const result = redact({
+      private_key: "k",
+      cookie: "sid=1",
+      refresh_token: "r",
+      client_secret: "s",
+    }) as Record<string, string>;
+    expect(result.private_key).toBe("***");
+    expect(result.cookie).toBe("***");
+    expect(result.refresh_token).toBe("***");
+    expect(result.client_secret).toBe("***");
+  });
+
   it("ネストした構造も再帰的にマスクする", () => {
     const result = redact({ outer: { token: "t", items: ["x@y.com"] } }) as {
       outer: { token: string; items: string[] };

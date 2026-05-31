@@ -4,8 +4,8 @@
  * バックエンドの {@link ../../../docs/observability/logging-spec.md} §2 と整合する形に整形する。
  */
 
-import type { SeverityText } from "./severity.js";
-import { SEVERITY_NUMBER } from "./severity.js";
+import type { SeverityText } from "./severity";
+import { SEVERITY_NUMBER } from "./severity";
 
 /** 構造化クライアントログ1件。 */
 export interface ClientLogRecord {

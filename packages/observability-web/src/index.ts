@@ -5,17 +5,24 @@
  * ログ規約({@link ../../../docs/observability/logging-spec.md})とスキーマ・重大度を揃える。
  */
 
-export { redact } from "./redaction.js";
-export { type SeverityText, SEVERITY_NUMBER, severityForHttpStatus } from "./severity.js";
-export { type ClientLogRecord, type ResourceInfo, buildRecord } from "./schema.js";
-export { type TraceContext, buildTraceparent, newTraceContext } from "./trace.js";
-export { type LogSink, type LoggerOptions, ClientLogger, createBeaconSink } from "./logger.js";
-export { type FetchFn, createInstrumentedFetch } from "./instrument.js";
-export { reportWebVitals } from "./vitals.js";
-export { registerGlobalErrorHandlers } from "./error.js";
+export { redact } from "./redaction";
+export { type SeverityText, SEVERITY_NUMBER, severityForHttpStatus } from "./severity";
+export { type ClientLogRecord, type ResourceInfo, buildRecord } from "./schema";
+export {
+  type TraceContext,
+  buildTraceparent,
+  childTraceContext,
+  getPageTrace,
+  newTraceContext,
+  startPageTrace,
+} from "./trace";
+export { type LogSink, type LoggerOptions, ClientLogger, createBeaconSink } from "./logger";
+export { type FetchFn, createInstrumentedFetch } from "./instrument";
+export { reportWebVitals } from "./vitals";
+export { registerGlobalErrorHandlers } from "./error";
 
-import { ClientLogger, type LogSink, createBeaconSink } from "./logger.js";
-import type { ResourceInfo } from "./schema.js";
+import { ClientLogger, type LogSink, createBeaconSink } from "./logger";
+import type { ResourceInfo } from "./schema";
 
 /** 可観測性の初期化オプション。 */
 export interface ObservabilityInit {

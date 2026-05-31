@@ -44,3 +44,40 @@ export function newTraceContext(): TraceContext {
 export function buildTraceparent(context: TraceContext): string {
   return `00-${context.traceId}-${context.spanId}-01`;
 }
+
+// ページ単位のルートトレース。ページ内の操作ログと各 fetch を同一 trace に束ねる。
+let pageTrace: TraceContext | null = null;
+
+/**
+ * ページ単位のルートトレースを開始する(ページ読み込み時に呼ぶ)。
+ *
+ * @returns 生成したトレース文脈。
+ */
+export function startPageTrace(): TraceContext {
+  pageTrace = newTraceContext();
+  return pageTrace;
+}
+
+/**
+ * 現在のページトレースを返す(未開始なら null)。
+ *
+ * @returns ページトレース文脈、または null。
+ */
+export function getPageTrace(): TraceContext | null {
+  return pageTrace;
+}
+
+/**
+ * 同一トレース内の新しい span 文脈を返す。
+ *
+ * ページトレースがあれば同じ `traceId` の新しい `spanId`、無ければ新規トレースを生成する。
+ * これにより各 fetch がページトレースの子 span となり、フロント→バックが1 trace で繋がる。
+ *
+ * @returns 子 span の文脈。
+ */
+export function childTraceContext(): TraceContext {
+  if (pageTrace) {
+    return { traceId: pageTrace.traceId, spanId: randomHex(8) };
+  }
+  return newTraceContext();
+}

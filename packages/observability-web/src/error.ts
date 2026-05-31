@@ -5,7 +5,7 @@
  * ({@link ../../../docs/observability/frontend-logging.md} §2)。
  */
 
-import type { ClientLogger } from "./logger.js";
+import type { ClientLogger } from "./logger";
 
 /**
  * ブラウザのグローバルエラーハンドラを登録する。

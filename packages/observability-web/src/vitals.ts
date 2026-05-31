@@ -8,7 +8,7 @@
 import type { Metric } from "web-vitals";
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 
-import type { ClientLogger } from "./logger.js";
+import type { ClientLogger } from "./logger";
 
 /**
  * Web Vitals の計測を開始し、各指標をロガーに送る。

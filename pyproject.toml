@@ -1,0 +1,93 @@
+# FlowNote モノレポ — uv ワークスペースのルート定義。
+# ルート自体はパッケージではなく(=virtual)、共通のツール設定とメンバ束ねを担う。
+[project]
+name = "flownote-workspace"
+version = "0.1.0"
+description = "FlowNote モノレポ (主目的: ログ/可観測性システムの構築と観察)"
+requires-python = ">=3.14"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/api", "apps/ai-mock", "packages/observability-py"]
+
+[tool.uv.sources]
+flownote-observability = { workspace = true }
+flownote-api = { workspace = true }
+flownote-ai-mock = { workspace = true }
+
+[dependency-groups]
+# ワークスペース全体で共有する開発ツール。
+dev = [
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+]
+
+# --- 共通ツール設定（全メンバが継承）---------------------------------------
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["apps/api/src", "apps/ai-mock/src", "packages/observability-py/src"]
+
+[tool.ruff.lint]
+# 宣言的・型安全・最新記法を促すルール群を選択。
+select = [
+    "E", "F", "W",      # pyflakes / pycodestyle
+    "I",                 # isort
+    "UP",                # pyupgrade (最新記法)
+    "B",                 # bugbear
+    "ANN",               # 型注釈の強制
+    "RUF",               # ruff固有
+    "SIM",               # 単純化
+    "PTH",               # pathlib
+    "TID",               # import整理
+]
+ignore = [
+    "ANN401",  # ここでは Any を別途 mypy で禁止するため重複を避ける
+    # 日本語ドキュメント前提のため、全角記号の曖昧性警告は抑止する。
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["ANN201", "ANN001", "S101"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+# Any の暗黙利用・未型付けを抑止する厳格設定。
+# (disallow_any_explicit は pydantic プラグイン生成コードと衝突するため不採用。
+#  明示 Any の回避はレビュー基準 code-review-standards で担保する。)
+disallow_any_generics = true
+warn_unreachable = true
+warn_redundant_casts = true
+no_implicit_reexport = true
+pretty = true
+mypy_path = [
+    "packages/observability-py/src",
+    "apps/api/src",
+    "apps/ai-mock/src",
+]
+
+[[tool.mypy.overrides]]
+# テストは表現力優先で一部緩和。
+module = "tests.*"
+disallow_any_explicit = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = [
+    "packages/observability-py/tests",
+    "apps/api/tests",
+    "apps/ai-mock/tests",
+]
+addopts = "-ra --strict-markers"

@@ -1,0 +1,4 @@
+# FlowNote モノレポ — pnpm ワークスペース定義(フロントエンド側)。
+packages:
+  - "apps/web"
+  - "packages/observability-web"

@@ -1,0 +1,20 @@
+# 共有可観測性パッケージ。アプリはログ/トレース/メトリクスをここ経由でのみ扱う。
+[project]
+name = "flownote-observability"
+version = "0.1.0"
+description = "FlowNote 共有可観測性ライブラリ (構造化ログ/OTel/相関/マスキング/GenAI計測)"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.10",
+    "structlog>=24.4",
+    "opentelemetry-api>=1.29",
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flownote_observability"]

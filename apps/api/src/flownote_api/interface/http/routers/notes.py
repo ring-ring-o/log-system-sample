@@ -8,6 +8,7 @@ from flownote_api.container import Container
 from flownote_api.domain.identity import Permission, User
 from flownote_api.interface.http.schemas import NoteCreate, NoteOut, NoteUpdate
 from flownote_api.interface.security.auth import get_container, require_permission
+from flownote_observability import AuditOutcome, emit_audit
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
@@ -108,3 +109,10 @@ async def delete_note(
         container: 依存コンテナ。
     """
     await container.notes.delete(owner_id=user.id, note_id=note_id)
+    # 機微操作(削除)は監査ログへ([audit-logging] §3)。
+    emit_audit(
+        action="note.delete",
+        outcome=AuditOutcome.SUCCESS,
+        user_id=user.id,
+        resource=f"note:{note_id}",
+    )

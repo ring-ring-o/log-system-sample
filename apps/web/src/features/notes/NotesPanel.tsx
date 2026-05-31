@@ -12,7 +12,7 @@ import { Button } from "@/components/Button";
 import { type Note, createApiClient } from "@/shared/api-client";
 import { getClientLogger } from "@/shared/observability";
 import { useToken } from "@/shared/use-token";
-import { color, font, space } from "@/tokens/tokens";
+import { color, font, radius, space } from "@/tokens/tokens";
 
 /**
  * メモ機能のパネル。
@@ -59,7 +59,7 @@ export function NotesPanel() {
   }
 
   return (
-    <section style={{ padding: space[4], borderRadius: space[2], background: color.bgSubtle }}>
+    <section style={{ padding: space[4], borderRadius: radius.md, background: color.bgSubtle }}>
       <h2 style={{ fontSize: font.sizeLg }}>メモ</h2>
       <div style={{ display: "flex", gap: space[2], marginBottom: space[4] }}>
         <input

@@ -74,6 +74,12 @@ extend-immutable-calls = [
 [tool.mypy]
 python_version = "3.14"
 strict = true
+# `uv run mypy`(引数なし)で全ソースを検査できるよう対象を明示する。
+files = [
+    "packages/observability-py/src",
+    "apps/api/src",
+    "apps/ai-mock/src",
+]
 # Any の暗黙利用・未型付けを抑止する厳格設定。
 # (disallow_any_explicit は pydantic プラグイン生成コードと衝突するため不採用。
 #  明示 Any の回避はレビュー基準 code-review-standards で担保する。)

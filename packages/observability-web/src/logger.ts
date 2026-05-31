@@ -6,11 +6,11 @@
  * {@link ../../../docs/observability/frontend-logging.md} 参照。
  */
 
-import { redact } from "./redaction.js";
-import type { ClientLogRecord, ResourceInfo } from "./schema.js";
-import { buildRecord } from "./schema.js";
-import type { SeverityText } from "./severity.js";
-import type { TraceContext } from "./trace.js";
+import { redact } from "./redaction";
+import type { ClientLogRecord, ResourceInfo } from "./schema";
+import { buildRecord } from "./schema";
+import type { SeverityText } from "./severity";
+import type { TraceContext } from "./trace";
 
 /** ログ送出先。整形済みレコードを受け取る。 */
 export type LogSink = (record: ClientLogRecord) => void;

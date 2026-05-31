@@ -1,9 +1,10 @@
 """構造化ログのパイプライン構築。
 
 structlog のプロセッサ列で [ログ規約](../../../docs/observability/logging-spec.md) を実装する。
-出力は1行JSON(JSON Lines)で標準出力へ流し、コンテナ標準出力 → OTel Collector の
-``filelog`` レシーバ経由で SigNoz へ収集する設計
-([可観測性アーキテクチャ](../../../docs/observability/observability-architecture.md))。
+出力は1行JSON(JSON Lines)で標準出力へ流す。ローカルでは `docker logs`/コンソールで観察し、
+本番ではコンテナ標準出力を集約する log-shipping agent(fluentbit 等)で収集する想定
+(トレース/メトリクスは OTLP で Collector へ。
+[可観測性アーキテクチャ](../../../docs/observability/observability-architecture.md))。
 
 プロセッサの責務:
     1. contextvars マージ(相関キーの継承)

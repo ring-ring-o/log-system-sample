@@ -6,13 +6,13 @@
  * 検索クエリ本文はログに記録しない(操作イベントのみ)。結果はバックエンドの AI ユースケース由来。
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/Button";
 import { type SearchHit, createApiClient } from "@/shared/api-client";
 import { getClientLogger } from "@/shared/observability";
 import { useToken } from "@/shared/use-token";
-import { color, font, space } from "@/tokens/tokens";
+import { color, font, radius, space } from "@/tokens/tokens";
 
 /**
  * AI 統合検索のパネル。
@@ -23,7 +23,8 @@ export function SearchPanel() {
   const token = useToken();
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
-  const api = createApiClient(() => token);
+  // トークンが変わったときだけ API クライアントを作り直す(安定参照)。
+  const api = useMemo(() => createApiClient(() => token), [token]);
 
   /**
    * 検索を実行する。
@@ -36,7 +37,7 @@ export function SearchPanel() {
   }
 
   return (
-    <section style={{ padding: space[4], borderRadius: space[2], background: color.bgSubtle }}>
+    <section style={{ padding: space[4], borderRadius: radius.md, background: color.bgSubtle }}>
       <h2 style={{ fontSize: font.sizeLg }}>AI 統合検索</h2>
       <div style={{ display: "flex", gap: space[2], marginBottom: space[4] }}>
         <input

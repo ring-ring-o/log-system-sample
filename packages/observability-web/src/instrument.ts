@@ -5,9 +5,9 @@
  * 構造化ログに記録する({@link ../../../docs/observability/frontend-logging.md} §3)。
  */
 
-import type { ClientLogger } from "./logger.js";
-import { severityForHttpStatus } from "./severity.js";
-import { buildTraceparent, newTraceContext } from "./trace.js";
+import type { ClientLogger } from "./logger";
+import { severityForHttpStatus } from "./severity";
+import { buildTraceparent, childTraceContext } from "./trace";
 
 /** `fetch` 互換のシグネチャ。 */
 export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -21,7 +21,8 @@ export type FetchFn = (input: string | URL | Request, init?: RequestInit) => Pro
  */
 export function createInstrumentedFetch(logger: ClientLogger, baseFetch: FetchFn = fetch): FetchFn {
   return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const trace = newTraceContext();
+    // ページトレースの子 span として発番し、ログとバックエンドを同一 trace に束ねる。
+    const trace = childTraceContext();
     const headers = new Headers(init?.headers);
     headers.set("traceparent", buildTraceparent(trace));
 

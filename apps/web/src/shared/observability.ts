@@ -5,7 +5,12 @@
  * コンソールへ出力するフォールバック sink を用い、開発を止めない。
  */
 
-import { type ClientLogRecord, ClientLogger, createBeaconSink } from "@flownote/observability-web";
+import {
+  type ClientLogRecord,
+  ClientLogger,
+  createBeaconSink,
+  getPageTrace,
+} from "@flownote/observability-web";
 
 let cached: ClientLogger | null = null;
 
@@ -32,10 +37,12 @@ export function getClientLogger(): ClientLogger {
     resource: {
       serviceName: "flownote-web",
       serviceVersion: "0.1.0",
-      environment: process.env.NODE_ENV ?? "local",
+      environment: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV ?? "local",
     },
     // 収集先があれば OTLP(ログ)へ、無ければコンソールへ。
     sink: endpoint ? createBeaconSink(`${endpoint}/v1/logs`) : consoleSink,
+    // ページトレースに相関させ、ログ↔トレースを結びつける([frontend-logging] §3)。
+    getTrace: () => getPageTrace(),
   });
   return cached;
 }

@@ -73,7 +73,9 @@ class ObservabilityMiddleware:
             attributes = {
                 "event.domain": "access",
                 "http.request.method": request.method,
-                "http.route": request.url.path,
+                # 実IDを含む生パスではなくルートテンプレート(例 /api/notes/{note_id})を用いる
+                # (logging-spec §4.2/§4.3 のカーディナリティ規約)。
+                "http.route": _route_template(scope, request.url.path),
                 "http.response.status_code": status,
                 "http.server.request.duration_ms": duration_ms,
             }
@@ -86,3 +88,21 @@ class ObservabilityMiddleware:
             else:
                 bound.info("http.request.completed")
             clear_request_context()
+
+
+def _route_template(scope: Scope, fallback: str) -> str:
+    """マッチしたルートのテンプレートパスを返す。
+
+    Starlette はルーティング後に ``scope["route"]`` を設定する。APIRoute の ``path`` は
+    ``/api/notes/{note_id}`` のようなテンプレートで、実IDを含まない。
+
+    Args:
+        scope: ASGI スコープ(ルーティング後)。
+        fallback: ルート未解決時(404 等)に用いる値。
+
+    Returns:
+        ルートテンプレート、解決できなければ ``fallback``。
+    """
+    route = scope.get("route")
+    template = getattr(route, "path", None)
+    return template if isinstance(template, str) else fallback

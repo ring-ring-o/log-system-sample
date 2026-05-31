@@ -20,9 +20,9 @@
 
 ## 3. トレース相関（最重要）
 
-- `@opentelemetry/sdk-trace-web` + fetch/XHR 自動計装で、ブラウザ発の API 呼び出しに **W3C `traceparent`** を付与する。
-- これによりブラウザの span → FastAPI の server span → DB/AI span が**1つの trace** に繋がる。
-- クライアントログにも現在の `trace_id`/`span_id` を載せ、ログ↔トレースを相関させる。
+- API 呼び出し(`fetch`)に **W3C `traceparent`** を付与し、ブラウザ → FastAPI の server span → DB/AI span を**1つの trace** に繋ぐ。
+- **ページ単位のルートトレース**を持ち、ページ内の各 `fetch` はその子 span(同一 `trace_id`・新しい `span_id`)として発番する。クライアントログにも同じ `trace_id`/`span_id` を載せ、ログ↔トレースを相関させる。
+- **実装方針**: 依存を最小化するため、現状は OTel Web SDK を使わず W3C 準拠の `traceparent` を自前生成する軽量実装(`packages/observability-web`)。本番では `@opentelemetry/sdk-trace-web` + fetch 自動計装へ差し替え可能(span のネスト・サンプリング・OTLP トレース送出を SDK に委ねる)。
 
 ## 4. 送出経路
 
@@ -49,11 +49,13 @@
 ## 7. 実装の置き場所
 
 - 共有実装: `packages/observability-web`
-  - `init.ts`: WebTracerProvider + OTLP exporter + fetch計装 + propagator 設定。
-  - `logger.ts`: 構造化クライアントロガー（スキーマ整形・マスク・送出）。
-  - `vitals.ts`: Web Vitals 収集。
-  - `error.ts`: グローバルエラー/Promiseハンドラ、Error Boundary連携。
-- `apps/web` は上記を `instrumentation`/`providers` で初期化し、各コンポーネントは `logger` のみ参照。
+  - `trace.ts`: W3C `traceparent` 生成、ページトレース・子 span 発番。
+  - `instrument.ts`: `fetch` 計装(`traceparent` 付与 + アクセスログ)。
+  - `logger.ts` / `schema.ts` / `severity.ts`: 構造化クライアントロガー(スキーマ整形・相関・送出 sink)。
+  - `redaction.ts`: 送出前マスキング。
+  - `vitals.ts`: Web Vitals 収集。 `error.ts`: グローバルエラー/Promise ハンドラ。
+  - `index.ts`: 公開 API と `createLogger` ファクトリ。
+- `apps/web` は `components/Providers.tsx`(`"use client"`)で `startPageTrace()`・Web Vitals・エラーハンドラを初期化し、各コンポーネントは `shared/observability.ts` の `getClientLogger()` と `shared/api-client.ts`(計装 fetch)のみ参照する。
 
 ## 8. テストで固定する事項（vitest）
 

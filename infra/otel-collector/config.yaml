@@ -5,24 +5,15 @@
 
 receivers:
   # api/web からの OTLP(トレース/メトリクス/ログ)を受信。
+  # アプリのトレース/メトリクスは OTLP で届く。構造化ログ(JSON)はアプリの標準出力に出るため、
+  # 本番でコンテナログを集約する場合は別途 stdout を tail する agent(filelog/fluentbit 等)を
+  # 用いる(12-factor)。ローカルでは `docker logs` / コンソールで観察する。
   otlp:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
-  # アプリが標準出力へ出す構造化ログ(JSON)をファイル経由で収集する場合に使用。
-  # api コンテナのログを共有ボリュームに出力する構成と併用する(任意)。
-  filelog:
-    include:
-      - /var/log/flownote/*.jsonl
-    start_at: end
-    operators:
-      - type: json_parser
-        # trace_id/span_id を相関フィールドとして取り込む。
-        timestamp:
-          parse_from: attributes.timestamp
-          layout: "%Y-%m-%dT%H:%M:%S.%fZ"
 
 processors:
   # メモリ保護(過負荷時のドロップ)。
@@ -63,7 +54,7 @@ service:
       processors: [memory_limiter, resource, batch]
       exporters: [debug, file]
     logs:
-      receivers: [otlp, filelog]
+      receivers: [otlp]
       processors: [memory_limiter, resource, batch]
       exporters: [debug, file]
   telemetry:

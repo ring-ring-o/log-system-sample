@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -144,7 +145,8 @@ class KeycloakJwtVerifier:
             InvalidTokenError: 署名不正・期限切れ・クレーム不一致など。
         """
         try:
-            signing_key = self._jwk_client.get_signing_key_from_jwt(token)
+            # JWKS 取得は同期I/Oのため、イベントループを止めないようスレッドに逃がす。
+            signing_key = await asyncio.to_thread(self._jwk_client.get_signing_key_from_jwt, token)
             claims: dict[str, object] = jwt.decode(
                 token,
                 signing_key.key,

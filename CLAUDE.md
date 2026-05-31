@@ -27,7 +27,7 @@ apps/web          Next.js 16 フロントエンド
 apps/ai-mock      OpenAI互換モックサーバ（開発用）
 packages/observability-py    共有: 構造化ログ/OTel/相関/マスキング/GenAI計測（中核）
 packages/observability-web   共有: ブラウザ計装/クライアントロガー
-infra             docker-compose / otel-collector / keycloak / signoz
+infra             docker-compose / otel-collector / keycloak / signoz(profile起動・最小)
 docs              設計・規約    .claude/skills 再利用スキル
 ```
 
@@ -100,5 +100,7 @@ docker compose -f infra/compose.yaml --profile signoz up -d   # SigNozは重い
 ## 9. 環境メモ
 
 - Python 3.14 は uv 管理。ライブラリは最新安定版（3.14非対応なら近接版にフォールバックし理由を記録）。
+- **Next.js 16 / Auth.js v5 は現状 beta を採用**（v16 の安定版が未リリースのため。要件「v16 の最新安定版」に対するフォールバックとして記録）。安定版リリース後に更新する。
 - AI は OpenAI互換。開発時は `apps/ai-mock` を使用（vLLMは重いため）。
 - SigNoz/ClickHouse は重く完全起動は不確実 → console/file exporter で観察を担保。
+- ログは標準出力(JSON)、トレース/メトリクスは OTLP。本番のログ集約は stdout を tail する agent を想定。

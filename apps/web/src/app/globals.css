@@ -1,0 +1,77 @@
+/*
+ * デザイントークン(CSS変数)。
+ * 3層モデル(primitive → semantic)。UI は semantic 層のみを参照する。
+ * 規約: .claude/skills/design-tokens/SKILL.md
+ */
+
+:root {
+  /* --- primitive(生値・意味なし)--- */
+  --color-slate-50: #f8fafc;
+  --color-slate-200: #e2e8f0;
+  --color-slate-500: #64748b;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-green-600: #16a34a;
+  --color-amber-500: #f59e0b;
+  --color-red-600: #dc2626;
+  --color-white: #ffffff;
+
+  /* --- semantic(用途・UIはここを参照)--- */
+  --color-bg-default: var(--color-white);
+  --color-bg-subtle: var(--color-slate-50);
+  --color-text-default: var(--color-slate-900);
+  --color-text-muted: var(--color-slate-500);
+  --color-border-default: var(--color-slate-200);
+  --color-intent-primary-bg: var(--color-blue-600);
+  --color-intent-primary-fg: var(--color-white);
+  --color-intent-primary-hover: var(--color-blue-500);
+  --color-intent-success-fg: var(--color-green-600);
+  --color-intent-warning-fg: var(--color-amber-500);
+  --color-intent-danger-fg: var(--color-red-600);
+
+  /* --- spacing(4pxグリッド)--- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* --- typography --- */
+  --font-family-base: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-body: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-weight-normal: 400;
+  --font-weight-bold: 700;
+
+  /* --- radius / shadow / z --- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --z-modal: 1000;
+}
+
+[data-theme="dark"] {
+  /* semantic を上書き(参照側は無変更でテーマ切替)。 */
+  --color-bg-default: var(--color-slate-900);
+  --color-bg-subtle: var(--color-slate-800);
+  --color-text-default: var(--color-slate-50);
+  --color-text-muted: var(--color-slate-200);
+  --color-border-default: var(--color-slate-800);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  color: var(--color-text-default);
+  background: var(--color-bg-default);
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@flownote/observability-web",
+  "version": "0.1.0",
+  "description": "FlowNote 共有可観測性ライブラリ(ブラウザ: 構造化ログ/トレース相関/マスキング)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "web-vitals": "^4.2.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

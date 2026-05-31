@@ -1,0 +1,17 @@
+{
+  "name": "flownote-frontend-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FlowNote フロントエンド(pnpm ワークスペースのルート)",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "biome": "biome check .",
+    "biome:fix": "biome check --write .",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "typescript": "^5.7.2"
+  }
+}

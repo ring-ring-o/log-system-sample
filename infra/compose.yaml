@@ -1,0 +1,103 @@
+# FlowNote ローカル構成。
+# 開発時はアプリをローカルコマンドで起動してもよい(コンテナにこだわりすぎない)。
+# 例: docker compose -f infra/compose.yaml up -d postgres keycloak otel-collector ai-mock
+#     SigNoz を含める場合: docker compose -f infra/compose.yaml --profile signoz up -d
+name: flownote
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: flownote
+      POSTGRES_PASSWORD: flownote
+      POSTGRES_DB: flownote
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flownote"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: ["--config=/etc/otel/config.yaml"]
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otel/config.yaml:ro
+      - ./volumes/otel-output:/var/log/otel
+      - ./volumes/flownote-logs:/var/log/flownote:ro
+
+  ai-mock:
+    build:
+      context: ..
+      dockerfile: apps/ai-mock/Dockerfile
+    ports:
+      - "8001:8001"
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    environment:
+      FLOWNOTE_ENV: dev
+      FLOWNOTE_REPO_BACKEND: sql
+      FLOWNOTE_DATABASE_URL: postgresql+psycopg://flownote:flownote@postgres:5432/flownote
+      FLOWNOTE_AI_BACKEND: openai
+      FLOWNOTE_AI_BASE_URL: http://ai-mock:8001
+      FLOWNOTE_AUTH_MODE: oidc
+      FLOWNOTE_OIDC_JWKS_URL: http://keycloak:8080/realms/flownote/protocol/openid-connect/certs
+      FLOWNOTE_OIDC_ISSUER: http://keycloak:8080/realms/flownote
+      FLOWNOTE_OIDC_AUDIENCE: flownote-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-mock:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      NEXT_PUBLIC_OTLP_ENDPOINT: http://localhost:4318
+      AUTH_KEYCLOAK_ISSUER: http://localhost:8080/realms/flownote
+      AUTH_KEYCLOAK_ID: flownote-web
+      AUTH_KEYCLOAK_SECRET: flownote-web-dev-secret
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  # --- SigNoz(任意・重量級。--profile signoz で起動)-------------------------
+  # 完全な SigNoz スタックは公式デプロイ(ClickHouse 等多数のサービス)を参照のこと。
+  # ここでは収集経路の確認用に最小サービスのみを置く。詳細は infra/README.md。
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1.2-alpine
+    profiles: ["signoz"]
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./volumes/clickhouse:/var/lib/clickhouse

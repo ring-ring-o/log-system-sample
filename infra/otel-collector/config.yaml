@@ -1,0 +1,71 @@
+# OpenTelemetry Collector 設定。
+# アプリ(api/web)からの OTLP を受け、整形・バッチして配送する。
+# ローカル確実観察のため debug/file exporter を常用し、SigNoz へは任意で転送する
+# ([可観測性アーキテクチャ](../../docs/observability/observability-architecture.md))。
+
+receivers:
+  # api/web からの OTLP(トレース/メトリクス/ログ)を受信。
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  # アプリが標準出力へ出す構造化ログ(JSON)をファイル経由で収集する場合に使用。
+  # api コンテナのログを共有ボリュームに出力する構成と併用する(任意)。
+  filelog:
+    include:
+      - /var/log/flownote/*.jsonl
+    start_at: end
+    operators:
+      - type: json_parser
+        # trace_id/span_id を相関フィールドとして取り込む。
+        timestamp:
+          parse_from: attributes.timestamp
+          layout: "%Y-%m-%dT%H:%M:%S.%fZ"
+
+processors:
+  # メモリ保護(過負荷時のドロップ)。
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+  # 収集経路を識別する運用属性を付与。
+  resource:
+    attributes:
+      - key: collector.name
+        value: flownote-otel-collector
+        action: upsert
+  # 送信効率化のためのバッチ。
+  batch:
+    timeout: 5s
+
+exporters:
+  # ローカル確実観察用(SigNoz が無くても相関を確認できる)。
+  debug:
+    verbosity: normal
+  file:
+    path: /var/log/otel/otel-output.jsonl
+  # SigNoz へ転送する場合に有効化(--profile signoz)。
+  otlp/signoz:
+    endpoint: signoz-otel-collector:4317
+    tls:
+      insecure: true
+
+service:
+  # 既定では debug/file へ。SigNoz 起動時は各 exporters に otlp/signoz を追加する。
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, file]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, file]
+    logs:
+      receivers: [otlp, filelog]
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, file]
+  telemetry:
+    logs:
+      level: info

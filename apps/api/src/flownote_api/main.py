@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from flownote_api.application.usecases.ai import AIService
 from flownote_api.application.usecases.notes import NoteService
@@ -61,15 +62,18 @@ _logger = get_logger("flownote_api.main")
 
 
 def _build_repositories(
-    settings: Settings,
+    settings: Settings, engine: AsyncEngine | None
 ) -> tuple[NoteRepository, VersionRepository, TaskRepository]:
     """設定に応じてリポジトリ実装を構築する。
 
+    SQL バックエンドでは呼び出し側(lifespan)が生成・破棄まで管理する単一エンジンを共有する。
+
     Args:
         settings: アプリ設定。
+        engine: SQL バックエンド時に共有する非同期エンジン(memory 時は ``None``)。
 
     Returns:
-        (メモ, バージョン, タスク) のリポジトリ。SQL の場合は同一エンジンを共有する。
+        (メモ, バージョン, タスク) のリポジトリ。
     """
     if settings.repo_backend == "memory":
         return (
@@ -77,12 +81,8 @@ def _build_repositories(
             InMemoryVersionRepository(),
             InMemoryTaskRepository(),
         )
-    # sqlite ファイル利用時は格納先ディレクトリを用意する。
-    if settings.database_url.startswith("sqlite") and ":///" in settings.database_url:
-        Path(".tmp").mkdir(exist_ok=True)
-    engine = create_engine(settings.database_url)
-    # SQLAlchemy を計装し db.* 属性付き span を得る。
-    SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
+    if engine is None:
+        raise RuntimeError("sql バックエンドにはエンジンが必要です")
     session_factory = make_session_factory(engine)
     return (
         SqlNoteRepository(session_factory),
@@ -110,17 +110,20 @@ def _build_token_verifier(settings: Settings) -> TokenVerifier:
     return DevTokenVerifier(default_roles=frozenset({Role.EDITOR}))
 
 
-def build_container(settings: Settings, genai: GenAIInstrumentation) -> Container:
+def build_container(
+    settings: Settings, genai: GenAIInstrumentation, engine: AsyncEngine | None = None
+) -> Container:
     """設定から依存コンテナを構築する。
 
     Args:
         settings: アプリ設定。
         genai: GenAI 計装ファサード。
+        engine: SQL バックエンド時に共有する非同期エンジン(memory 時は不要)。
 
     Returns:
         各ユースケースを束ねた :class:`Container`。
     """
-    notes_repo, versions_repo, tasks_repo = _build_repositories(settings)
+    notes_repo, versions_repo, tasks_repo = _build_repositories(settings, engine)
     clock = SystemClock()
     ids = UuidGenerator()
 
@@ -165,14 +168,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        # SQL バックエンド時はスキーマを用意(ローカル/テスト用)。
+        # SQL バックエンド時はエンジンを1本だけ生成し、起動〜終了で共有・破棄する。
+        engine: AsyncEngine | None = None
         if resolved.repo_backend == "sql":
             if resolved.database_url.startswith("sqlite") and ":///" in resolved.database_url:
                 Path(".tmp").mkdir(exist_ok=True)
             engine = create_engine(resolved.database_url)
             await init_models(engine)
-            await engine.dispose()
-        app.state.container = build_container(resolved, genai)
+            # SQLAlchemy を計装し db.* 属性付き span を得る(ランタイムと同一エンジン)。
+            SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
+        app.state.container = build_container(resolved, genai, engine)
         _logger.info(
             "app.started",
             **{
@@ -182,7 +187,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "flownote.auth_mode": resolved.auth_mode,
             },
         )
-        yield
+        try:
+            yield
+        finally:
+            # エンジンのコネクションプールを確実に破棄する(リーク防止)。
+            if engine is not None:
+                await engine.dispose()
 
     app = FastAPI(title="FlowNote API", version=resolved.service_version, lifespan=lifespan)
     # ミドルウェアを先に追加し、その後 OTel 計装(より外側)で包む。
@@ -190,8 +200,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolved.cors_origins,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # 最小権限: 実際に用いる method/header に限定する。
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["authorization", "content-type", "x-request-id", "traceparent"],
     )
     register_exception_handlers(app)
     for module in (health, notes, tasks, versions, ai):

@@ -16,6 +16,7 @@ from flownote_api.settings import Settings
 from flownote_observability import GenAIInstrumentation, ObservabilityConfig
 
 _EDITOR = {"Authorization": "Bearer alice:editor"}
+_ADMIN = {"Authorization": "Bearer alice:admin"}
 
 
 @pytest.fixture
@@ -120,3 +121,37 @@ async def test_invalid_token_is_security_logged(
     security = [r for r in records if _attributes(r).get("event.domain") == "security"]
     assert security, "セキュリティログが無い"
     assert _attributes(security[-1]).get("audit.action") == "auth.token.verify"
+
+
+async def test_access_log_route_is_templated(
+    client: AsyncClient, capfd: pytest.CaptureFixture[str]
+) -> None:
+    # 実IDを含むパスへのアクセスでも http.route はテンプレートになる(カーディナリティ規約)。
+    created = await client.post("/api/notes", headers=_EDITOR, json={"title": "t", "body": ""})
+    note_id = created.json()["id"]
+    capfd.readouterr()
+    await client.get(f"/api/notes/{note_id}", headers=_EDITOR)
+
+    records = _parse_log_lines(capfd.readouterr().out)
+    access = [r for r in records if r.get("body") == "http.request.completed"]
+    assert access
+    route = _attributes(access[-1]).get("http.route")
+    assert route == "/api/notes/{note_id}"
+    # 実ID(高カーディナリティ値)はルートに含まれない。
+    assert isinstance(route, str)
+    assert note_id not in route
+
+
+async def test_delete_is_audited(client: AsyncClient, capfd: pytest.CaptureFixture[str]) -> None:
+    # 削除(機微操作)は admin で実行し、監査ログ(note.delete)に記録される。
+    created = await client.post("/api/notes", headers=_ADMIN, json={"title": "t", "body": ""})
+    note_id = created.json()["id"]
+    capfd.readouterr()
+    response = await client.delete(f"/api/notes/{note_id}", headers=_ADMIN)
+    assert response.status_code == 204
+
+    records = _parse_log_lines(capfd.readouterr().out)
+    deletes = [r for r in records if r.get("body") == "note.delete"]
+    assert deletes, "削除の監査ログが無い"
+    assert _attributes(deletes[-1]).get("event.domain") == "audit"
+    assert _attributes(deletes[-1]).get("authz.resource") == f"note:{note_id}"

@@ -23,6 +23,11 @@ from flownote_observability import (
     emit_security,
 )
 
+# 許可(allow)を監査する機微権限。これ以外の allow は監査せず量を抑える([audit-logging] §3)。
+_SENSITIVE_PERMISSIONS: frozenset[Permission] = frozenset(
+    {Permission.NOTE_DELETE, Permission.TASK_DELETE}
+)
+
 
 def get_container(request: Request) -> Container:
     """リクエストからアプリの依存コンテナを取り出す。
@@ -123,15 +128,17 @@ def require_permission(
                 client_address=client_address,
             )
             raise PermissionDeniedError(permission.value)
-        # 許可も記録する(機微操作の証跡)。
-        emit_audit(
-            action="authz.decision",
-            outcome=AuditOutcome.SUCCESS,
-            user_id=user.id,
-            roles=[r.value for r in user.roles],
-            permission=permission.value,
-            decision=AuthzDecision.ALLOW,
-        )
+        # 量制御([audit-logging] §3): 許可は機微操作(削除)のみ記録。通常の read/write は
+        # access ログに委ね、監査ログの膨張を避ける。拒否は上で必ず記録済み。
+        if permission in _SENSITIVE_PERMISSIONS:
+            emit_audit(
+                action="authz.decision",
+                outcome=AuditOutcome.SUCCESS,
+                user_id=user.id,
+                roles=[r.value for r in user.roles],
+                permission=permission.value,
+                decision=AuthzDecision.ALLOW,
+            )
         return user
 
     return _dependency

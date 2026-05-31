@@ -8,6 +8,7 @@ from flownote_api.container import Container
 from flownote_api.domain.identity import Permission, User
 from flownote_api.interface.http.schemas import TaskCreate, TaskOut, TaskStatusUpdate
 from flownote_api.interface.security.auth import get_container, require_permission
+from flownote_observability import AuditOutcome, emit_audit
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 
@@ -90,3 +91,10 @@ async def delete_task(
         container: 依存コンテナ。
     """
     await container.tasks.delete(owner_id=user.id, task_id=task_id)
+    # 機微操作(削除)は監査ログへ([audit-logging] §3)。
+    emit_audit(
+        action="task.delete",
+        outcome=AuditOutcome.SUCCESS,
+        user_id=user.id,
+        resource=f"task:{task_id}",
+    )

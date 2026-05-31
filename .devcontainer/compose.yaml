@@ -1,0 +1,17 @@
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - vscode-server:/home/vscode/.vscode-server
+      - uv-cache:/home/vscode/.cache/uv
+    command: sleep infinity
+    user: vscode
+    environment:
+      - SHELL=/bin/zsh
+
+volumes:
+  vscode-server:
+  uv-cache:

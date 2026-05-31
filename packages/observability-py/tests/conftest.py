@@ -23,13 +23,20 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 class OtelHarness:
     """テスト用の OTel 観測ハーネス。
 
+    グローバルプロバイダの設定状況に依存せず、ローカルのプロバイダから直接 tracer/meter を供給する
+    (他パッケージの import がグローバルを先に設定していても影響を受けないため)。
+
     Attributes:
         spans: 終了済み span を保持するインメモリエクスポータ。
         reader: メトリクスを読み出すインメモリリーダ。
+        tracer: ローカルプロバイダ由来のトレーサ。
+        meter: ローカルプロバイダ由来のメータ。
     """
 
     spans: InMemorySpanExporter
     reader: InMemoryMetricReader
+    tracer: trace.Tracer
+    meter: metrics.Meter
 
 
 @pytest.fixture(autouse=True)
@@ -55,10 +62,17 @@ def otel_env() -> Iterator[OtelHarness]:
     span_exporter = InMemorySpanExporter()
     tracer_provider = TracerProvider()
     tracer_provider.add_span_processor(SimpleSpanProcessor(span_exporter))
+    # 相関テスト用に、未設定であればグローバルにも有効な SDK プロバイダを供給する
+    # (既に他パッケージが設定済みなら OTel 側で no-op となり既存を温存する)。
     trace.set_tracer_provider(tracer_provider)
 
     reader = InMemoryMetricReader()
     meter_provider = MeterProvider(metric_readers=[reader])
     metrics.set_meter_provider(meter_provider)
 
-    yield OtelHarness(spans=span_exporter, reader=reader)
+    yield OtelHarness(
+        spans=span_exporter,
+        reader=reader,
+        tracer=tracer_provider.get_tracer("genai-test"),
+        meter=meter_provider.get_meter("genai-test"),
+    )

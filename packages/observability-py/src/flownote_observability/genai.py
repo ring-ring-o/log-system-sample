@@ -58,11 +58,15 @@ class GenAIInstrumentation:
     Attributes:
         config: 可観測性構成(本文キャプチャ可否・トランケート長を参照)。
         pricing: モデル別の概算単価表。
+        tracer: 使用するトレーサ(未指定ならグローバルプロバイダから取得)。
+        meter: 使用するメータ(未指定ならグローバルプロバイダから取得)。テスト時に明示注入できる。
     """
 
     config: ObservabilityConfig
     pricing: PriceTable = field(default_factory=lambda: _DEFAULT_PRICING)
     logger: structlog.stdlib.BoundLogger = field(default_factory=_default_genai_logger)
+    tracer: trace.Tracer | None = None
+    meter: metrics.Meter | None = None
     _tracer: trace.Tracer = field(init=False)
     _token_usage: metrics.Histogram = field(init=False)
     _duration: metrics.Histogram = field(init=False)
@@ -71,8 +75,8 @@ class GenAIInstrumentation:
 
     def __post_init__(self) -> None:
         """トレーサとメトリクス計器を初期化する。"""
-        self._tracer = trace.get_tracer("flownote_observability.genai")
-        meter = metrics.get_meter("flownote_observability.genai")
+        self._tracer = self.tracer or trace.get_tracer("flownote_observability.genai")
+        meter = self.meter or metrics.get_meter("flownote_observability.genai")
         self._token_usage = meter.create_histogram(
             "gen_ai.client.token.usage", unit="{token}", description="AI トークン使用量"
         )

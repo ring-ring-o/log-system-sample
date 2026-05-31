@@ -1,0 +1,60 @@
+# ============================================================
+# FlowNote モノレポ .gitignore
+# 方針: 生成物・依存・秘密・ローカル状態は追跡しない
+# ============================================================
+
+# --- Python / uv ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.uv/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# --- Node / pnpm / Next.js ---
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+storybook-static/
+coverage/
+
+# --- 秘密・環境変数 ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- ローカル可観測性出力 ---
+*.log
+logs/
+otel-output/
+*.otel.jsonl
+
+# --- Docker / インフラのローカル状態 ---
+infra/volumes/
+infra/**/data/
+
+# --- OS / エディタ ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- 一時 ---
+.tmp/
+tmp/

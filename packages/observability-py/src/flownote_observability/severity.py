@@ -66,20 +66,37 @@ def severity_from_name(name: str) -> Severity:
     return _NAME_TO_SEVERITY.get(name.strip().lower(), Severity.INFO)
 
 
+# 4xx のうち、攻撃/異常(Unexpected client error)としてセキュリティ的注意を要する状態。
+# これらは WARN。残りの 4xx(仕様内の期待される失敗: 404/422 等)は INFO とする。
+# 一律 WARN にするとアラート閾値が健全な利用でも上がり、慣れて無視されるため2段階にする
+# ([ログ規約] §3)。
+_WARN_CLIENT_ERRORS: frozenset[int] = frozenset(
+    {
+        401,  # Unauthorized(認証失敗)
+        403,  # Forbidden(認可拒否)
+        407,  # Proxy Authentication Required
+        426,  # Upgrade Required
+        428,  # Precondition Required
+        429,  # Too Many Requests(レート制限)
+    }
+)
+
+
 def severity_for_http_status(status_code: int) -> Severity:
     """HTTP ステータスコードから既定の重大度を決める。
 
     [ログ規約](../../../docs/observability/logging-spec.md) §3 のルールに従う。
-    4xx はクライアント起因のため WARN、5xx はサーバ失敗のため ERROR とする。
+    5xx はサーバ失敗のため ERROR。4xx は2段階に分け、認証/認可/レート制限等の
+    **異常・攻撃シグナル**は WARN、バリデーション失敗・未存在など**期待される失敗**は INFO。
 
     Args:
         status_code: HTTP ステータスコード。
 
     Returns:
-        2xx/3xx は INFO、4xx は WARN、5xx 以上は ERROR。
+        5xx 以上は ERROR、注意すべき 4xx は WARN、その他の 4xx と 2xx/3xx は INFO。
     """
     if status_code >= 500:
         return Severity.ERROR
-    if status_code >= 400:
+    if status_code in _WARN_CLIENT_ERRORS:
         return Severity.WARN
     return Severity.INFO

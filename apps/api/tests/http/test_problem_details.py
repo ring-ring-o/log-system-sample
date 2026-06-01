@@ -114,7 +114,8 @@ async def test_conflict_does_not_leak_internal_context(
     assert len(handled) == 1
     # 内部文脈はログ側には出る(応答には出ない)。
     assert _attrs(handled[0]).get("flownote.note.id") == "secret-id-xyz"
-    assert handled[0]["severity_text"] == "WARN"
+    # 409 は期待される失敗のため INFO(§3 の2段階)。
+    assert handled[0]["severity_text"] == "INFO"
 
 
 async def test_unhandled_error_is_logged_once_as_error(

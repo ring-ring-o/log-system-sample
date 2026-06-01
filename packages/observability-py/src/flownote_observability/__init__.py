@@ -25,7 +25,12 @@ from flownote_observability.context import (
     hash_session_id,
 )
 from flownote_observability.genai import GenAICall, GenAIInstrumentation
-from flownote_observability.logging_setup import configure_logging, get_logger
+from flownote_observability.logging_setup import (
+    configure_logging,
+    get_log_level,
+    get_logger,
+    set_log_level,
+)
 from flownote_observability.operations import Operation, log_event, operation
 from flownote_observability.otel import configure_otel, get_meter, get_tracer
 from flownote_observability.schema import LogRecord
@@ -64,12 +69,14 @@ __all__ = [
     "configure_otel",
     "emit_audit",
     "emit_security",
+    "get_log_level",
     "get_logger",
     "get_meter",
     "get_tracer",
     "hash_session_id",
     "log_event",
     "operation",
+    "set_log_level",
     "severity_for_http_status",
     "severity_from_name",
 ]

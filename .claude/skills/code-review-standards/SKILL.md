@@ -36,10 +36,12 @@ description: >-
 ## 観点3: 可観測性（重点）
 
 `observability-logging` スキルと `docs/observability/` を基準に:
-- [ ] 構造化ログか（`print`/素の`console.log`がないか）。
+- [ ] 構造化ログか（`print`/素の`console.log`がないか）。計装は `operation`/`log_event`/`ClientLogger` 経由か（手組みの span+logger を増やしていないか）。
 - [ ] アプリログに `trace_id`/`span_id` が相関しているか。
-- [ ] メッセージに可変値を埋め込んでいないか（固定`body`＋属性）。
-- [ ] 重大度が適切か（4xx=WARN、5xx/未捕捉=ERROR、ERROR以上に`exception.*`）。
+- [ ] メッセージに可変値を埋め込んでいないか（固定`body`＋属性）。属性は OTel semconv / `flownote.*`、ID等の高カーディナリティは属性側か。単位は OTel 準拠（duration は**秒**）。
+- [ ] 重大度が適切か（5xx/未捕捉=ERROR、4xx は Expected=INFO / 異常=WARN の2段階、ERROR以上に`exception.*`）。
+- [ ] **エラーは境界で1度だけ**ログているか（ドメイン/アプリ層は `raise` のみ。log-and-rethrow が無いか）。
+- [ ] エラー応答が **RFC 9457 Problem Details**（`code`/`trace_id`）で、**内部詳細（`internal_context`）を漏らしていない**か。新エラーは安定 `code` を持ち `error_catalog()` に載るか。
 - [ ] 機密がマスクされるか（新規フィールドはマスク対象＋テスト追加）。
 - [ ] 認証認可イベントが監査ログ(`event.domain`)として分離されているか。
 - [ ] AI呼び出しが `gen_ai.*` 計装を通り、プロンプト本文が既定で出ないか。

@@ -10,10 +10,14 @@
 - **OpenTelemetry 準拠**で、ログ・トレース・メトリクスの3本柱を `trace_id`/`span_id` で相関させる方法
 - フロント操作 → API → AI/DB/認証 までを**1つの trace** で横断追跡する構成
 - **構造化ログ・マスキング・監査/セキュリティログ分離・GenAI(AI呼び出し)計装**の実装パターン
+- **エラー設計**: 安定エラーコード + RFC 9457 Problem Details + 内部/外部メッセージ分離 + 「エラーは境界で1度だけログる」原則
+- **開発者DX**: 規約を暗記せず1行で計装できる共有ファサード（`operation`/`log_event`）。可観測性の複雑さをライブラリが肩代わりする
+- **運用**: 動的ログレベル変更（再起動不要）・tail-based sampling（エラー trace 優先保持）
 - 規約を文章ではなく**テストで固定**する（「テストこそ唯一の真実源泉」）進め方
 - ベンダ非依存（OTLP → OTel Collector → SigNoz、ローカルは console/file exporter で代替）
 
-可観測性の規約と設計は [`docs/observability/`](./docs/observability/) が一次資料です。まずは
+可観測性の規約と設計は [`docs/observability/`](./docs/observability/) が一次資料です。まず計装の書き方は
+[ログ・クックブック(開発者DX)](./docs/observability/logging-cookbook.md)、規約の詳細は
 [ログ規約(SSOT)](./docs/observability/logging-spec.md) と
 [可観測性アーキテクチャ](./docs/observability/observability-architecture.md) を参照してください。
 

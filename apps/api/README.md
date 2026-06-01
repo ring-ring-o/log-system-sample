@@ -33,6 +33,7 @@ infrastructure ─→ application / domain        application(usecases)
 | GET/GET/POST | `/api/notes/{note_id}/versions`（`/diff`, `/{version_id}/restore`） | バージョン一覧・差分・復元 |
 | POST/GET/PATCH/DELETE | `/api/tasks`（`/{task_id}/status`） | タスク CRUD・状態更新 |
 | POST/POST/GET | `/api/ai/consult`, `/api/ai/search`, `/api/ai/progress` | AI 相談・検索・進捗 |
+| GET/PUT | `/admin/log-level` | 動的ログレベル参照・変更（`ADMIN` 限定・再起動不要） |
 
 ## 設定（環境変数 `FLOWNOTE_` 接頭辞）
 
@@ -73,3 +74,7 @@ Docker: [`Dockerfile`](./Dockerfile)（マルチステージ・非 root・standa
 ログは必ず `flownote_observability`（[packages/observability-py](../../packages/observability-py)）経由（`print` 禁止）。
 FastAPI / SQLAlchemy / httpx を自動計装し、`ObservabilityMiddleware` が相関 ID と HTTP ログを担う。
 AI 呼び出しは `GenAIInstrumentation` で計測する（[genai-observability.md](../../docs/observability/genai-observability.md)）。
+
+エラーは `domain/errors.py` の `DomainError`（安定コード `code` / `http_status` / 外部公開タイトルを保持）で表現し、
+HTTP 応答は **RFC 9457 Problem Details** に統一する。ログは「**境界で1度だけ**」記録する（[logging-spec §5](../../docs/observability/logging-spec.md)）。
+`ADMIN` ロールは `PUT /admin/log-level` でプロセス再起動なしにログ閾値を変更できる（変更は監査ログに残る）。

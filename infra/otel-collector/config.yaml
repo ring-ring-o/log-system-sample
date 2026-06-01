@@ -29,6 +29,30 @@ processors:
   # 送信効率化のためのバッチ。
   batch:
     timeout: 5s
+  # tail-based sampling: トレース全体を見てから保持を判断する。エラー/高レイテンシは必ず残し、
+  # 正常 trace は確率的に間引く。ヘッド(SDK)サンプリングと併用する場合、エラーを確実に保持
+  # するにはアプリ側を 100%(FLOWNOTE_TRACE_RATIO=1.0)にして判断を本処理に委ねるのが望ましい
+  # ([ログ規約] §8 / [ADR 0005](../../docs/adr/0005-log-transport.md))。
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 50000
+    expected_new_traces_per_sec: 100
+    policies:
+      # 1) エラーを含む trace は常に保持(アラート/障害解析の最重要データ)。
+      - name: keep-errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      # 2) 高レイテンシ(1s 超)の trace は常に保持(性能劣化の検知)。
+      - name: keep-slow
+        type: latency
+        latency:
+          threshold_ms: 1000
+      # 3) 残りは確率的に間引く(コスト制御)。
+      - name: baseline-probabilistic
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
 
 exporters:
   # ローカル確実観察用(SigNoz が無くても相関を確認できる)。
@@ -46,8 +70,9 @@ service:
   # 既定では debug/file へ。SigNoz 起動時は各 exporters に otlp/signoz を追加する。
   pipelines:
     traces:
+      # tail_sampling は完全な trace を見て判断するため batch の前に置く。
       receivers: [otlp]
-      processors: [memory_limiter, resource, batch]
+      processors: [memory_limiter, resource, tail_sampling, batch]
       exporters: [debug, file]
     metrics:
       receivers: [otlp]

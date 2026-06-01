@@ -37,6 +37,7 @@
 | `severity_text` | string | 重大度ラベル（§3）。 | `INFO` |
 | `severity_number` | int | OTel重大度番号（§3）。 | `9` |
 | `body` | string | 固定のイベント名/メッセージ。低カーディナリティに保つ。 | `http.request.completed` |
+| `flownote.log.schema_version` | string | ログスキーマ世代。規約進化時に ETL/パース側が判別できるよう必須。 | `1` |
 | `service.name` | string | 発生元サービス。 | `flownote-api` |
 | `service.version` | string | デプロイ識別。 | `0.1.0` |
 | `deployment.environment.name` | string | `local`/`dev`/`staging`/`prod`（OTel Stable の rename 後の名。旧 `deployment.environment` は使わない）。 | `local` |

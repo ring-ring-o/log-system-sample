@@ -35,6 +35,8 @@ from flownote_observability.config import ObservabilityConfig
 from flownote_observability.redaction import redact
 from flownote_observability.schema import (
     DEPLOYMENT_ENVIRONMENT_KEY,
+    LOG_SCHEMA_VERSION,
+    LOG_SCHEMA_VERSION_KEY,
     RESERVED_TOP_LEVEL_KEYS,
     SERVICE_NAME_KEY,
     SERVICE_VERSION_KEY,
@@ -186,6 +188,7 @@ def _make_resource_processor(config: ObservabilityConfig) -> Processor:
     """
 
     def _add_resource(_logger: object, _method: str, event_dict: EventDict) -> EventDict:
+        event_dict[LOG_SCHEMA_VERSION_KEY] = LOG_SCHEMA_VERSION
         event_dict[SERVICE_NAME_KEY] = config.service_name
         event_dict[SERVICE_VERSION_KEY] = config.service_version
         event_dict[DEPLOYMENT_ENVIRONMENT_KEY] = config.environment

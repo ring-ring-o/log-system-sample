@@ -10,6 +10,7 @@
 
 | いつ読むか | ドキュメント |
 |---|---|
+| **まず計装の書き方を知りたい（DX）** | [docs/observability/logging-cookbook.md](./docs/observability/logging-cookbook.md)（「やりたいこと → こう書く」。`operation`/`log_event`/`DomainError`。規約の暗記は不要） |
 | ログ実装・レビュー時（常時） | [docs/observability/logging-spec.md](./docs/observability/logging-spec.md)（**規約=SSOT**） |
 | 可観測性の全体像 | [docs/observability/observability-architecture.md](./docs/observability/observability-architecture.md) |
 | AI実装時 | [docs/observability/genai-observability.md](./docs/observability/genai-observability.md) |

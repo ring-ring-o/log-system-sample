@@ -17,6 +17,22 @@ description: >-
 - AI呼び出し・認証認可のログを設計する。
 - ログ実装をレビューする（`code-review-standards` と併用）。
 
+## 最短DXレシピ（使う側はこれだけ覚える）
+
+可観測性は**共有ファサードで肩代わり**し、アプリ開発者に全体理解を要求しない。これが本リポジトリの設計指針。
+
+| やりたいこと | こう書く |
+|---|---|
+| 業務操作を計装（span＋業務ログ＋失敗時 span=ERROR） | `with operation("note.create") as op: op.set(**{"note.id": id})` |
+| 単発の業務イベント | `log_event("note.deleted", **{"note.id": id})` |
+| エラーを返す | `raise NotFoundError(...)`（境界が Problem Details＋ログ化） |
+| アクセスログ/相関ID/trace_id | **自動**（ミドルウェア）。手で書かない |
+
+設計のキモ:
+- 属性キーは自動で `flownote.*` に正規化（既知の OTel 名前空間は尊重）。開発者は OTel 属性名を暗記しない。
+- 正常終了で INFO ログを1件、例外時は span=ERROR にして**再送出のみ**（ログは境界に集約）。
+- 詳細レシピは `docs/observability/logging-cookbook.md`。新規プロジェクトでも「3本柱を意識させない薄いファサード＋規約はテストで固定」を踏襲する。
+
 ## 中核の意思決定（最初に決める6つ）
 
 1. **規格**: OpenTelemetry を採用（ベンダ非依存）。収集先(SigNoz/Grafana/Datadog)は OTLP の先で差し替え可能にする。

@@ -2,7 +2,9 @@
 
 > 本書は当モノレポ全体（バックエンド/フロントエンド/AI/認証認可/インフラ）に適用される**ログの唯一の規約**である。
 > 各実装はこの規約を満たさなければならず、規約への準拠は**テスト**（`apps/api/tests/observability/` 等）によって固定される。
-> 関連文書: [可観測性アーキテクチャ](./observability-architecture.md) / [GenAI可観測性](./genai-observability.md) / [監査ログ](./audit-logging.md) / [マスキング規約](./redaction-policy.md) / [フロントエンドログ](./frontend-logging.md)
+> 関連文書: [ログ・クックブック(開発者DX)](./logging-cookbook.md) / [可観測性アーキテクチャ](./observability-architecture.md) / [GenAI可観測性](./genai-observability.md) / [監査ログ](./audit-logging.md) / [マスキング規約](./redaction-policy.md) / [フロントエンドログ](./frontend-logging.md)
+>
+> **実装する前に**: 規約の暗記は不要。まず [クックブック](./logging-cookbook.md) の「やりたいこと → こう書く」を見て、`operation`/`log_event`/`DomainError` を使う。規約はファサードとテストが守る。
 
 ## 0. 用語と前提
 

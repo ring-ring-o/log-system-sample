@@ -10,8 +10,10 @@
 
 | 入口 | 役割 |
 |---|---|
+| `operation(name, **attrs)` | **高レベルファサード**。span＋業務ログ＋失敗時 span=ERROR を1行で（→[クックブック](../../docs/observability/logging-cookbook.md)） |
+| `log_event(name, **attrs)` | span 不要の単発業務イベントを INFO で記録（名前空間・`event.domain` を自動付与） |
 | `bootstrap(config)` | ログ + トレース/メトリクスを一括初期化（合成ルートで一度だけ呼ぶ） |
-| `get_logger(name)` | 構造化ロガーを取得（`print` の代わりに必ずこれを使う） |
+| `get_logger(name)` | 構造化ロガーを取得（低レベル。通常は `operation`/`log_event` を使う） |
 | `GenAIInstrumentation` / `GenAICall` | AI 呼び出しの計装（トークン・モデル・レイテンシ） |
 | `emit_audit` / `emit_security` | 監査／セキュリティログの記録（`AuditOutcome` / `AuthzDecision`） |
 | `bind_request_context` / `clear_request_context` / `hash_session_id` | 相関コンテキストの束縛・解除・セッション ID ハッシュ |
@@ -23,6 +25,7 @@
 ## モジュール構成（[`src/flownote_observability/`](./src/flownote_observability/)）
 
 ```
+operations.py     高レベルファサード（operation/log_event。開発者DXの入口）
 config.py         ObservabilityConfig（環境変数からの構成・from_env）
 logging_setup.py  structlog ベースの構造化ログパイプライン
 otel.py           OTel トレース/メトリクスの設定（OTLP/HTTP・console/file フォールバック）

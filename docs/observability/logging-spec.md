@@ -72,7 +72,7 @@
     "http.request.method": "POST",
     "http.route": "/api/notes",
     "http.response.status_code": 201,
-    "http.server.request.duration_ms": 42.7
+    "http.server.request.duration": 0.0427
   }
 }
 ```
@@ -103,7 +103,7 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 
 | 名前空間 | 用途 | 主なキー |
 |---|---|---|
-| `http.*` | HTTPサーバ/クライアント | `http.request.method`, `http.route`, `http.response.status_code`, `http.server.request.duration_ms` |
+| `http.*` | HTTPサーバ/クライアント | `http.request.method`, `http.route`, `http.response.status_code`, `http.server.request.duration`（**単位は秒** `s`、UCUM準拠。`*_ms` は使わない） |
 | `db.*` | データベース | `db.system`(=`postgresql`), `db.operation.name`, `db.collection.name` |
 | `user.*` | 認証主体 | `user.id`, `user.roles`（PIIは禁止、§[マスキング](./redaction-policy.md)） |
 | `gen_ai.*` | 生成AI | [GenAI可観測性](./genai-observability.md)参照 |

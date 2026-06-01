@@ -39,7 +39,8 @@ export function createInstrumentedFetch(logger: ClientLogger, baseFetch: FetchFn
           "http.request.method": method,
           "url.path": toPath(url),
           "http.response.status_code": response.status,
-          "http.client.request.duration_ms": Math.round((now() - startedAt) * 1000) / 1000,
+          // OTel 準拠で単位は秒(UCUM `s`)。ミリ秒計測値を 1000 で割って秒へ。
+          "http.client.request.duration": Math.round(now() - startedAt) / 1000,
         },
         trace,
       );

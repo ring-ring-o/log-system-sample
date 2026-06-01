@@ -67,7 +67,8 @@ class ObservabilityMiddleware:
         try:
             await self._app(scope, receive, _send)
         finally:
-            duration_ms = round((time.perf_counter() - start) * 1000, 3)
+            # OTel Semantic Conventions に合わせ単位は秒(UCUM `s`)。`*_ms` は採用しない。
+            duration_s = round(time.perf_counter() - start, 6)
             status = status_holder["code"]
             severity = severity_for_http_status(status)
             attributes = {
@@ -77,7 +78,7 @@ class ObservabilityMiddleware:
                 # (logging-spec §4.2/§4.3 のカーディナリティ規約)。
                 "http.route": _route_template(scope, request.url.path),
                 "http.response.status_code": status,
-                "http.server.request.duration_ms": duration_ms,
+                "http.server.request.duration": duration_s,
             }
             bound = _logger.bind(**attributes)
             # 重大度に応じてレベルを選択(4xx=WARN, 5xx=ERROR, それ以外=INFO)。

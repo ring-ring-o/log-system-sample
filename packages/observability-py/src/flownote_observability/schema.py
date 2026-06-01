@@ -11,7 +11,8 @@ from pydantic import BaseModel, ConfigDict, Field
 # OTel リソース属性のドット区切りキー(トップレベル)。
 SERVICE_NAME_KEY = "service.name"
 SERVICE_VERSION_KEY = "service.version"
-DEPLOYMENT_ENVIRONMENT_KEY = "deployment.environment"
+# OTel Stable 化で `deployment.environment` は `deployment.environment.name` に rename された。
+DEPLOYMENT_ENVIRONMENT_KEY = "deployment.environment.name"
 
 
 class LogRecord(BaseModel):
@@ -27,7 +28,7 @@ class LogRecord(BaseModel):
         body: 低カーディナリティのイベント名/メッセージ。
         service_name: 発生元サービス(別名 ``service.name``)。
         service_version: バージョン(別名 ``service.version``)。
-        deployment_environment: 環境(別名 ``deployment.environment``)。
+        deployment_environment: 環境(別名 ``deployment.environment.name``)。
         trace_id: 相関トレースID。span 外なら ``None``。
         span_id: 相関 span ID。
         attributes: 構造化属性。
@@ -43,7 +44,7 @@ class LogRecord(BaseModel):
     # (値は上の *_KEY 定数と一致させること)。
     service_name: str = Field(alias="service.name")
     service_version: str = Field(alias="service.version")
-    deployment_environment: str = Field(alias="deployment.environment")
+    deployment_environment: str = Field(alias="deployment.environment.name")
     trace_id: str | None = None
     span_id: str | None = None
     # 属性は任意の JSON 互換値を取りうる異種バッグのため object 型とする

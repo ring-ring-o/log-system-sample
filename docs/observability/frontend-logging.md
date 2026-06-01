@@ -43,7 +43,7 @@
 ## 6. サンプリング・量制御
 
 - Web Vitals/操作ログは**ページビュー単位**でまとめ、過剰送出を避ける。
-- トレースは `deployment.environment` 別比率（[ログ規約 §8](./logging-spec.md)）に従う。`ERROR` は常時送出。
+- トレースは `deployment.environment.name` 別比率（[ログ規約 §8](./logging-spec.md)）に従う。`ERROR` は常時送出。
 - 開発(`local`)は 100%。
 
 ## 7. 実装の置き場所

@@ -12,7 +12,7 @@ structlog のプロセッサ列で [ログ規約](../../../docs/observability/lo
     3. 重大度付与(メソッド名 → Severity)
     4. トレース文脈付与(OTel の現在 span から trace_id/span_id)
     5. 例外情報の構造化(exception.*)
-    6. リソース属性付与(service.* / deployment.environment)
+    6. リソース属性付与(service.* / deployment.environment.name)
     7. スキーマ整形(予約キー以外を attributes へ集約、message → body)
     8. マスキング(機密の除去)
     9. JSON レンダリング
@@ -176,7 +176,7 @@ def _add_exception(_logger: object, _method: str, event_dict: EventDict) -> Even
 
 
 def _make_resource_processor(config: ObservabilityConfig) -> Processor:
-    """リソース属性(service.* / deployment.environment)を付与するプロセッサを作る。
+    """リソース属性(service.* / deployment.environment.name)を付与するプロセッサを作る。
 
     Args:
         config: 可観測性構成。

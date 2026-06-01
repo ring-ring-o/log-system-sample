@@ -39,7 +39,7 @@
 | `body` | string | 固定のイベント名/メッセージ。低カーディナリティに保つ。 | `http.request.completed` |
 | `service.name` | string | 発生元サービス。 | `flownote-api` |
 | `service.version` | string | デプロイ識別。 | `0.1.0` |
-| `deployment.environment` | string | `local`/`dev`/`staging`/`prod`。 | `local` |
+| `deployment.environment.name` | string | `local`/`dev`/`staging`/`prod`（OTel Stable の rename 後の名。旧 `deployment.environment` は使わない）。 | `local` |
 | `trace_id` | string(hex32) \| null | 相関トレースID。span外なら null。 | `4bf92f3577b34da6...` |
 | `span_id` | string(hex16) \| null | 相関spanID。 | `00f067aa0ba902b7` |
 | `attributes` | object | 構造化属性（§4）。 | `{"http.response.status_code": 200}` |
@@ -62,7 +62,7 @@
   "body": "http.request.completed",
   "service.name": "flownote-api",
   "service.version": "0.1.0",
-  "deployment.environment": "local",
+  "deployment.environment.name": "local",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
   "span_id": "00f067aa0ba902b7",
   "attributes": {

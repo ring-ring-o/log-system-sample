@@ -41,6 +41,9 @@ def test_log_conforms_to_schema() -> None:
     assert parsed.severity_text == "INFO"
     assert parsed.severity_number == 9
     assert parsed.service_name == "flownote-test"
+    # 環境キーは OTel Stable の rename 後の名(旧名は出さない)。
+    assert record["deployment.environment.name"] == "local"
+    assert "deployment.environment" not in record
     # 業務属性は attributes に集約される。
     assert record["attributes"] == {"flownote.note.id": "n1"}
 

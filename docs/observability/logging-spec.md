@@ -135,6 +135,43 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 - ドメイン例外は型で分類し、`event.domain="app"`。インフラ例外（DB/AI/ネットワーク）は原因 span にも記録（span status=ERROR）。
 - 例外は**握りつぶさない**。捕捉して継続する場合は最低 `WARN` でログし、理由属性を付す。
 
+### 5.1 エラーコードと内部/外部メッセージ分離
+
+`exception.type`（クラス完全名）は内部実装の都合で変わりうるため、**公開 API の識別子には使わない**。代わりに**安定したエラーコード** `flownote.error.code`（例 `RES.NOT_FOUND` / `AUTHZ.DENIED` / `VAL.INVALID`）を1つ持たせる。実装は `apps/api/.../domain/errors.py::DomainError` を唯一の源泉とし、`error_catalog()` でコード ↔ 意味 ↔ HTTP status を列挙できる。
+
+ドメイン例外は文言を構造的に分離する（機密のクライアント漏洩防止）:
+
+| 区分 | フィールド | 行き先 |
+|---|---|---|
+| 公開 | `code` / `public_title` / `public_detail` | クライアント応答（Problem Details）＋ログ |
+| 内部 | `internal_context`（内部ID・原因・SQL等） | **ログのみ**（応答には載せない） |
+
+### 5.2 クライアント応答は RFC 9457 Problem Details
+
+API がクライアントへ返すエラー本文は `application/problem+json`（[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)）に統一する。実装は `apps/api/.../interface/http/problem.py`。
+
+```json
+{
+  "type": "https://errors.flownote.example/RES.NOT_FOUND",
+  "title": "リソースが見つかりません",
+  "status": 404,
+  "code": "RES.NOT_FOUND",
+  "detail": "note が見つかりません",
+  "instance": "/api/notes/abc",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
+}
+```
+
+- `code`: クライアントは可変メッセージではなく**コードで分岐**する。
+- `trace_id`: エンドユーザーがサポートへ伝えれば、サポートが SigNoz でトレースを引き戻せる。
+
+### 5.3 エラーは「境界で1度だけ」ログる
+
+**ドメイン/アプリケーション層は失敗時に例外を `raise` するだけ**でログしない。ログは **interface 層の最外郭（例外ハンドラ）に集約**し、`flownote.error.code` 付きで**1件だけ**記録する。これにより「中継ぎでログ → 上位でも catch してログ」という **log-and-rethrow**（同一事象の重複ログ）を防ぎ、`ERROR` ベースのアラートが歪まない。
+
+- 認証/認可の失敗（401/403）は auth 層で監査/セキュリティログ済み（§別ストリーム）のため、境界では二重にログしない。
+- 構造ガードレール: ドメイン層は可観測性に非依存、ドメイン/アプリ層はエラー段階ログを持たない（`apps/api/tests/observability/test_log_at_boundary.py` で固定）。
+
 ## 6. 相関とコンテキスト伝播
 
 - **生成と束縛**: HTTP受信時にミドルウェアが span を開始し、`request_id`/`user.id`/`session_id` をコンテキスト（Python=`contextvars`、TS=`AsyncLocalStorage`）に束縛する。以降のログは自動でこれらを継承する。
@@ -173,6 +210,9 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 - ❌ 認証情報・PII・プロンプト全文の無制限ログ。
 - ❌ ループ内の無制御 `INFO` ログ（コスト爆発）。
 - ❌ 例外の握りつぶし（ログなしの `except: pass`）。
+- ❌ **log-and-rethrow**（下位層でログ → 上位でも catch してログ。同一事象が重複し ERROR アラートが歪む）。エラーは§5.3の通り境界で1度だけ。
+- ❌ クライアント応答へ内部詳細（SQL・内部ID・スタックトレース）を載せる（§5.1の分離を守る）。
+- ❌ 可変メッセージ文字列でのエラー判別（§5.1の `flownote.error.code` を使う）。
 - ❌ `trace_id` を持たないアプリログ（リクエスト文脈内なのに相関欠落）。
 
 ## 11. 準拠の固定（テスト）
@@ -184,3 +224,6 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 - マスキング: 機密フィールドが出力でマスクされる（[マスキング規約](./redaction-policy.md)）。
 - 重大度: 5xx/未捕捉例外が `ERROR`、4xxが `WARN`。
 - 監査分離: 認証認可イベントが `event.domain` で分離される（[監査ログ](./audit-logging.md)）。
+- エラー契約（§5）: ドメイン例外が安定 `code` と内部/外部分離を持つ（`tests/domain/test_errors.py`）。
+- Problem Details（§5.2）: エラー応答が `application/problem+json` で `code`/`trace_id` を持ち、内部詳細を漏らさない（`tests/http/test_problem_details.py`）。
+- 境界ログ（§5.3）: 失敗1件につき境界ログ1件。ドメイン/アプリ層はエラーログを持たない（`tests/observability/test_log_at_boundary.py`）。

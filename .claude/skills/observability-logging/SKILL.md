@@ -64,9 +64,16 @@ deployment.environment / trace_id / span_id / attributes{...}
 
 - スキーマ準拠（必須フィールド）/ 相関(trace_id付与) / マスキング / 重大度(5xx=ERROR) / 監査分離 / GenAI必須属性。
 
+## エラー設計（ログと表裏一体）
+
+- **安定エラーコード**: 例外に `<DOMAIN>.<NAME>`(例 `RES.NOT_FOUND`)を持たせ、ログに `flownote.error.code`、応答に `code` として出す。クラス名やメッセージで判別させない。
+- **内部/外部分離**: 例外は `public_title`/`public_detail`(公開)と `internal_context`(ログ専用・機密含む)を構造的に分ける。応答に内部詳細を載せない。
+- **RFC 9457 Problem Details**: クライアント応答は `application/problem+json`(`type`/`title`/`status`/`code`/`detail`/`instance`/`trace_id`)に統一。`trace_id` でサポートが引き戻せる。
+- **境界で1度だけログる**: 下位層は `raise` のみ。ログは interface 層の例外ハンドラに集約し1件だけ記録(log-and-rethrow 禁止)。認証認可失敗は監査/セキュリティで別途記録済みなので二重ログしない。
+
 ## アンチパターン
 
-`print`直出力 / メッセージへの値埋め込み / 機密の無制限ログ / ループ内無制御INFO / 例外握りつぶし / trace_idなしアプリログ。
+`print`直出力 / メッセージへの値埋め込み / 機密の無制限ログ / ループ内無制御INFO / 例外握りつぶし / **log-and-rethrow(重複ログ)** / **応答への内部詳細漏洩** / **可変メッセージでのエラー判別** / trace_idなしアプリログ。
 
 ## 参照
 

@@ -36,6 +36,7 @@ class Permission(StrEnum):
         TASK_WRITE: タスク作成・更新。
         TASK_DELETE: タスク削除。
         AI_USE: AI 機能の利用。
+        ADMIN_MANAGE: 運用管理操作(動的ログレベル変更等)。
     """
 
     NOTE_READ = "note:read"
@@ -45,6 +46,7 @@ class Permission(StrEnum):
     TASK_WRITE = "task:write"
     TASK_DELETE = "task:delete"
     AI_USE = "ai:use"
+    ADMIN_MANAGE = "admin:manage"
 
 
 # ロール → 権限集合。上位ロールは下位の権限を包含する。
@@ -57,6 +59,7 @@ _EDITOR_PERMS: frozenset[Permission] = _VIEWER_PERMS | {
 _ADMIN_PERMS: frozenset[Permission] = _EDITOR_PERMS | {
     Permission.NOTE_DELETE,
     Permission.TASK_DELETE,
+    Permission.ADMIN_MANAGE,
 }
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {

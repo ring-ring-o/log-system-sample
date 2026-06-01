@@ -52,7 +52,7 @@ from flownote_api.infrastructure.security.token import (
     KeycloakJwtVerifier,
     TokenVerifier,
 )
-from flownote_api.interface.http.routers import ai, health, notes, tasks, versions
+from flownote_api.interface.http.routers import admin, ai, health, notes, tasks, versions
 from flownote_api.interface.middleware.errors import register_exception_handlers
 from flownote_api.interface.middleware.observability import ObservabilityMiddleware
 from flownote_api.settings import Settings
@@ -206,7 +206,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["authorization", "content-type", "x-request-id", "traceparent"],
     )
     register_exception_handlers(app)
-    for module in (health, notes, tasks, versions, ai):
+    for module in (health, notes, tasks, versions, ai, admin):
         app.include_router(module.router)
 
     # 自動計装(HTTP server span / httpx client span)。

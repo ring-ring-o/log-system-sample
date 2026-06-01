@@ -33,6 +33,10 @@ def test_role_permission_hierarchy() -> None:
     # admin は削除も可。
     assert admin.has_permission(Permission.NOTE_DELETE)
     assert admin.has_permission(Permission.TASK_DELETE)
+    # 運用管理(動的ログレベル変更等)は admin のみ。
+    assert admin.has_permission(Permission.ADMIN_MANAGE)
+    assert not editor.has_permission(Permission.ADMIN_MANAGE)
+    assert not viewer.has_permission(Permission.ADMIN_MANAGE)
 
 
 def test_note_title_validation() -> None:

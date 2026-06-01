@@ -41,22 +41,59 @@ from flownote_observability.schema import (
     SERVICE_NAME_KEY,
     SERVICE_VERSION_KEY,
 )
-from flownote_observability.severity import severity_from_name
+from flownote_observability.severity import Severity, severity_from_name
 
 # structlog プロセッサのイベント辞書型。値は任意の Python 値になりうる。
 type EventDict = MutableMapping[str, object]
 type Processor = Callable[[object, str, EventDict], EventDict]
 
-# ログレベル名 → stdlib logging レベル(structlog のフィルタ用)。
-_LEVEL_NAME_TO_INT: dict[str, int] = {
-    "TRACE": logging.DEBUG,
-    "DEBUG": logging.DEBUG,
-    "INFO": logging.INFO,
-    "WARN": logging.WARNING,
-    "WARNING": logging.WARNING,
-    "ERROR": logging.ERROR,
-    "FATAL": logging.CRITICAL,
-}
+# 動的に変更可能なログ閾値(OTel SeverityNumber)。これ未満の重大度はプロセッサ段で破棄する。
+# 既定は最も緩い TRACE(=破棄しない)。configure_logging が構成値で初期化し、運用中は
+# set_log_level でプロセス再起動なしに引き上げ/引き下げできる(incident 対応)。
+_runtime_min_severity: int = int(Severity.TRACE)
+
+
+def set_log_level(level: str) -> None:
+    """実行中のログ閾値をプロセス再起動なしに変更する。
+
+    本番事故時に再起動(状態リセット)を避けつつ、一時的に ``DEBUG`` へ下げて詳細を得る等の
+    運用を可能にする([ログ規約] §7)。
+
+    Args:
+        level: ``TRACE``/``DEBUG``/``INFO``/``WARN``/``ERROR``/``FATAL`` のいずれか
+            (大小・別名を許容)。未知の名前は ``INFO`` 相当にフォールバックする。
+    """
+    global _runtime_min_severity
+    _runtime_min_severity = int(severity_from_name(level))
+
+
+def get_log_level() -> str:
+    """現在のログ閾値ラベルを返す。
+
+    Returns:
+        ``INFO`` などの重大度ラベル。
+    """
+    return Severity(_runtime_min_severity).text
+
+
+def _level_gate(_logger: object, _method: str, event_dict: EventDict) -> EventDict:
+    """実行時閾値より低い重大度のレコードを破棄する(動的レベル制御)。
+
+    Args:
+        _logger: 未使用。
+        _method: 未使用。
+        event_dict: 加工中のイベント辞書(``severity_number`` 付与済み)。
+
+    Returns:
+        閾値以上のイベント辞書。
+
+    Raises:
+        structlog.DropEvent: 閾値未満で破棄する場合。
+    """
+    severity_number = event_dict.get("severity_number")
+    if isinstance(severity_number, int) and severity_number < _runtime_min_severity:
+        raise structlog.DropEvent
+    return event_dict
 
 
 def _add_timestamp(_logger: object, _method: str, event_dict: EventDict) -> EventDict:
@@ -259,6 +296,8 @@ def build_processors(config: ObservabilityConfig) -> list[Processor]:
         structlog.contextvars.merge_contextvars,
         _add_timestamp,
         _add_severity,
+        # 重大度付与の直後に動的閾値で破棄判定する(set_log_level で運用中に変更可)。
+        _level_gate,
         _add_trace_context,
         _add_exception,
         _make_resource_processor(config),
@@ -275,11 +314,14 @@ def configure_logging(config: ObservabilityConfig) -> None:
     Args:
         config: 可観測性構成。
     """
-    min_level = _LEVEL_NAME_TO_INT.get(config.log_level.upper(), logging.INFO)
+    # 構成値で実行時閾値を初期化する。以降は set_log_level で動的に変更できる。
+    set_log_level(config.log_level)
+    # フィルタリングは _level_gate(動的)が担うため、束縛ロガーは最も緩い DEBUG に固定する
+    # (こうしないと起動時レベルで静的に切られ、運用中の引き下げが効かない)。
     processors: list[Processor] = build_processors(config)
     structlog.configure(
         processors=[*processors, structlog.processors.JSONRenderer(ensure_ascii=False)],
-        wrapper_class=structlog.make_filtering_bound_logger(min_level),
+        wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,
     )

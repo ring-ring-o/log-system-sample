@@ -87,6 +87,11 @@ async def test_access_log_is_correlated(
     attrs = _attributes(last)
     assert attrs["http.response.status_code"] == 200
     assert attrs["http.route"] == "/api/notes"
+    # 所要時間は OTel 準拠で秒(UCUM `s`)。`*_ms` キーは使わない。
+    assert "http.server.request.duration_ms" not in attrs
+    duration = attrs["http.server.request.duration"]
+    assert isinstance(duration, int | float)
+    assert 0 <= duration < 10  # 秒スケール(ミリ秒なら数十〜数百になる)
     # アクセスログがトレースに相関している(FastAPI 自動計装の span)。
     assert isinstance(last["trace_id"], str)
 

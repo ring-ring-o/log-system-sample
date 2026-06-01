@@ -11,7 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field
 # OTel リソース属性のドット区切りキー(トップレベル)。
 SERVICE_NAME_KEY = "service.name"
 SERVICE_VERSION_KEY = "service.version"
-DEPLOYMENT_ENVIRONMENT_KEY = "deployment.environment"
+# OTel Stable 化で `deployment.environment` は `deployment.environment.name` に rename された。
+DEPLOYMENT_ENVIRONMENT_KEY = "deployment.environment.name"
+# ログスキーマのバージョン。規約進化時に ETL/パース側が世代を判別できるよう必須で付与する。
+LOG_SCHEMA_VERSION_KEY = "flownote.log.schema_version"
+LOG_SCHEMA_VERSION = "1"
 
 
 class LogRecord(BaseModel):
@@ -25,9 +29,10 @@ class LogRecord(BaseModel):
         severity_text: 重大度ラベル (``INFO`` 等)。
         severity_number: OTel SeverityNumber。
         body: 低カーディナリティのイベント名/メッセージ。
+        log_schema_version: ログスキーマ世代(別名 ``flownote.log.schema_version``)。
         service_name: 発生元サービス(別名 ``service.name``)。
         service_version: バージョン(別名 ``service.version``)。
-        deployment_environment: 環境(別名 ``deployment.environment``)。
+        deployment_environment: 環境(別名 ``deployment.environment.name``)。
         trace_id: 相関トレースID。span 外なら ``None``。
         span_id: 相関 span ID。
         attributes: 構造化属性。
@@ -39,11 +44,12 @@ class LogRecord(BaseModel):
     severity_text: str
     severity_number: int
     body: str
+    log_schema_version: str = Field(alias="flownote.log.schema_version")
     # alias は mypy/pydantic プラグインの要請でリテラル文字列を用いる
     # (値は上の *_KEY 定数と一致させること)。
     service_name: str = Field(alias="service.name")
     service_version: str = Field(alias="service.version")
-    deployment_environment: str = Field(alias="deployment.environment")
+    deployment_environment: str = Field(alias="deployment.environment.name")
     trace_id: str | None = None
     span_id: str | None = None
     # 属性は任意の JSON 互換値を取りうる異種バッグのため object 型とする
@@ -58,6 +64,7 @@ RESERVED_TOP_LEVEL_KEYS: frozenset[str] = frozenset(
         "severity_text",
         "severity_number",
         "body",
+        LOG_SCHEMA_VERSION_KEY,
         SERVICE_NAME_KEY,
         SERVICE_VERSION_KEY,
         DEPLOYMENT_ENVIRONMENT_KEY,

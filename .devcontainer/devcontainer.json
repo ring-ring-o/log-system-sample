@@ -1,50 +1,50 @@
 {
-    "name": "log-system-sample",
-    "dockerComposeFile": "compose.yaml",
-    "service": "devcontainer",
-    "workspaceFolder": "/workspace",
-    "remoteUser": "vscode",
-    "updateRemoteUserUID": true,
-    "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.vscode-server /home/vscode/.cache 2>/dev/null || true",
-    "postStartCommand": "bash /workspace/.devcontainer/init.sh",
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "charliermarsh.ruff",
-                "codezombiech.gitignore",
-                "eamodio.gitlens",
-                "exiasr.hadolint",
-                "mosapride.zenkaku",
-                "ms-azuretools.vscode-docker",
-                "ms-python.python",
-                "njpwerner.autodocstring",
-                "oderwat.indent-rainbow",
-                "shardulm94.trailing-spaces",
-                "streetsidesoftware.code-spell-checker",
-                "yzhang.markdown-all-in-one",
-                "tamasfe.even-better-toml"
-            ],
-            "settings": {
-                "terminal.integrated.defaultProfile.linux": "zsh",
-                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-                "[python]": {
-                    "editor.defaultFormatter": "charliermarsh.ruff",
-                    "editor.formatOnSave": true,
-                    "editor.codeActionsOnSave": {
-                        "source.fixAll": "explicit",
-                        "source.organizeImports": "explicit"
-                    }
-                },
-                "ruff.nativeServer": "on"
-            }
-        }
-    },
-    "features": {
-        "ghcr.io/devcontainers/features/docker-in-docker:3.0.1": {
-            "version": "latest"
-        }
-    },
-    "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly,type=bind,consistency=cached"
-    ]
+  "name": "log-system-sample",
+  "dockerComposeFile": "compose.yaml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.vscode-server /home/vscode/.cache 2>/dev/null || true",
+  "postStartCommand": "bash /workspace/.devcontainer/init.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "charliermarsh.ruff",
+        "codezombiech.gitignore",
+        "eamodio.gitlens",
+        "exiasr.hadolint",
+        "mosapride.zenkaku",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "njpwerner.autodocstring",
+        "oderwat.indent-rainbow",
+        "shardulm94.trailing-spaces",
+        "streetsidesoftware.code-spell-checker",
+        "yzhang.markdown-all-in-one",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        },
+        "ruff.nativeServer": "on"
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:3.0.1": {
+      "version": "latest"
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly,type=bind,consistency=cached"
+  ]
 }

@@ -30,7 +30,14 @@ def test_severity_from_name_handles_aliases() -> None:
 def test_http_status_mapping() -> None:
     assert severity_for_http_status(200) is Severity.INFO
     assert severity_for_http_status(302) is Severity.INFO
-    assert severity_for_http_status(404) is Severity.WARN
+    # 期待される失敗(未存在/検証失敗)は INFO に下げ、アラート閾値を健全に保つ。
+    assert severity_for_http_status(404) is Severity.INFO
+    assert severity_for_http_status(422) is Severity.INFO
+    assert severity_for_http_status(409) is Severity.INFO
+    # 異常/攻撃シグナル(認証/認可/レート制限)は WARN。
     assert severity_for_http_status(401) is Severity.WARN
+    assert severity_for_http_status(403) is Severity.WARN
+    assert severity_for_http_status(429) is Severity.WARN
+    # サーバ失敗は ERROR。
     assert severity_for_http_status(500) is Severity.ERROR
     assert severity_for_http_status(503) is Severity.ERROR

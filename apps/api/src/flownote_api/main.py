@@ -178,10 +178,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # SQLAlchemy を計装し db.* 属性付き span を得る(ランタイムと同一エンジン)。
             SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
         app.state.container = build_container(resolved, genai, engine)
+        # deployment.environment.name はリソース属性として全ログに自動付与されるため、
+        # ここでは重複させず業務固有の構成のみ記録する。
         _logger.info(
             "app.started",
             **{
-                "deployment.environment": resolved.environment,
                 "flownote.repo_backend": resolved.repo_backend,
                 "flownote.ai_backend": resolved.ai_backend,
                 "flownote.auth_mode": resolved.auth_mode,

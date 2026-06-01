@@ -38,13 +38,14 @@ def _build_resource(config: ObservabilityConfig) -> Resource:
         config: 可観測性構成。
 
     Returns:
-        ``service.name``/``service.version``/``deployment.environment`` を持つ Resource。
+        ``service.name``/``service.version``/``deployment.environment.name`` を持つ Resource。
     """
     return Resource.create(
         {
             "service.name": config.service_name,
             "service.version": config.service_version,
-            "deployment.environment": config.environment,
+            # OTel Stable: `deployment.environment` は `deployment.environment.name` に rename。
+            "deployment.environment.name": config.environment,
         }
     )
 

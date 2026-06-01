@@ -37,9 +37,10 @@
 | `severity_text` | string | 重大度ラベル（§3）。 | `INFO` |
 | `severity_number` | int | OTel重大度番号（§3）。 | `9` |
 | `body` | string | 固定のイベント名/メッセージ。低カーディナリティに保つ。 | `http.request.completed` |
+| `flownote.log.schema_version` | string | ログスキーマ世代。規約進化時に ETL/パース側が判別できるよう必須。 | `1` |
 | `service.name` | string | 発生元サービス。 | `flownote-api` |
 | `service.version` | string | デプロイ識別。 | `0.1.0` |
-| `deployment.environment` | string | `local`/`dev`/`staging`/`prod`。 | `local` |
+| `deployment.environment.name` | string | `local`/`dev`/`staging`/`prod`（OTel Stable の rename 後の名。旧 `deployment.environment` は使わない）。 | `local` |
 | `trace_id` | string(hex32) \| null | 相関トレースID。span外なら null。 | `4bf92f3577b34da6...` |
 | `span_id` | string(hex16) \| null | 相関spanID。 | `00f067aa0ba902b7` |
 | `attributes` | object | 構造化属性（§4）。 | `{"http.response.status_code": 200}` |
@@ -62,7 +63,7 @@
   "body": "http.request.completed",
   "service.name": "flownote-api",
   "service.version": "0.1.0",
-  "deployment.environment": "local",
+  "deployment.environment.name": "local",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
   "span_id": "00f067aa0ba902b7",
   "attributes": {
@@ -72,7 +73,7 @@
     "http.request.method": "POST",
     "http.route": "/api/notes",
     "http.response.status_code": 201,
-    "http.server.request.duration_ms": 42.7
+    "http.server.request.duration": 0.0427
   }
 }
 ```
@@ -91,7 +92,11 @@ OTel `SeverityNumber` に一対一で対応させる。アプリは下表の6レ
 | `FATAL` | 21 | プロセス継続不能。 | 起動時必須設定の欠落、DB接続不可で起動失敗 |
 
 ルール:
-- **4xx はクライアント起因**であり既定で `WARN`（認可拒否は `audit`+`WARN`）。**5xx と未捕捉例外は `ERROR`**。
+- **4xx は2段階**で扱う（一律 WARN にすると健全な利用でもアラート閾値近くまで上がり、慣れて無視されるため）:
+  - **期待される失敗（Expected）= `INFO`**: バリデーション失敗(422)、未存在(404)、競合(409) などクライアントの仕様内動作。
+  - **異常/攻撃シグナル（Unexpected）= `WARN`**: 認証失敗(401)、認可拒否(403)、レート制限(429)、426/428 など。認可拒否は加えて `audit`+`WARN`。
+  - 実装は `severity_for_http_status`（WARN 集合を `_WARN_CLIENT_ERRORS` で定義）を唯一の源泉とする。
+- **5xx と未捕捉例外は `ERROR`**。
 - `ERROR` 以上には必ず `exception.*` 属性（§5）を付ける。
 - アラート閾値は `severity_number >= 17`（ERROR）を基準に設計する。
 
@@ -103,7 +108,7 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 
 | 名前空間 | 用途 | 主なキー |
 |---|---|---|
-| `http.*` | HTTPサーバ/クライアント | `http.request.method`, `http.route`, `http.response.status_code`, `http.server.request.duration_ms` |
+| `http.*` | HTTPサーバ/クライアント | `http.request.method`, `http.route`, `http.response.status_code`, `http.server.request.duration`（**単位は秒** `s`、UCUM準拠。`*_ms` は使わない） |
 | `db.*` | データベース | `db.system`(=`postgresql`), `db.operation.name`, `db.collection.name` |
 | `user.*` | 認証主体 | `user.id`, `user.roles`（PIIは禁止、§[マスキング](./redaction-policy.md)） |
 | `gen_ai.*` | 生成AI | [GenAI可観測性](./genai-observability.md)参照 |

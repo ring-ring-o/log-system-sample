@@ -26,6 +26,7 @@ from flownote_observability.context import (
 )
 from flownote_observability.genai import GenAICall, GenAIInstrumentation
 from flownote_observability.logging_setup import configure_logging, get_logger
+from flownote_observability.operations import Operation, log_event, operation
 from flownote_observability.otel import configure_otel, get_meter, get_tracer
 from flownote_observability.schema import LogRecord
 from flownote_observability.severity import (
@@ -54,6 +55,7 @@ __all__ = [
     "GenAIInstrumentation",
     "LogRecord",
     "ObservabilityConfig",
+    "Operation",
     "Severity",
     "bind_request_context",
     "bootstrap",
@@ -66,6 +68,8 @@ __all__ = [
     "get_meter",
     "get_tracer",
     "hash_session_id",
+    "log_event",
+    "operation",
     "severity_for_http_status",
     "severity_from_name",
 ]

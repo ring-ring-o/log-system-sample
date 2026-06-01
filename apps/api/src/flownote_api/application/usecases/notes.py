@@ -1,7 +1,8 @@
 """メモのユースケース。
 
-ポート(契約)にのみ依存し、具体実装は知らない([architecture.md] §3)。業務境界に手動 span を
-張り、業務イベントを構造化ログに記録する([可観測性アーキテクチャ] §7)。
+ポート(契約)にのみ依存し、具体実装は知らない([architecture.md] §3)。業務境界の計装は
+高レベルファサード :func:`operation`/:func:`log_event` に委ねる(span 開始・属性付与・
+業務ログ・失敗時 span=ERROR を1行で規約準拠にする。[可観測性アーキテクチャ] §7)。
 """
 
 from __future__ import annotations
@@ -17,10 +18,7 @@ from flownote_api.domain.ports import (
     VersionRepository,
 )
 from flownote_api.domain.versions import Version
-from flownote_observability import get_logger, get_tracer
-
-_logger = get_logger("flownote_api.usecases.notes")
-_tracer = get_tracer("flownote_api.usecases.notes")
+from flownote_observability import log_event, operation
 
 
 @dataclass(slots=True)
@@ -52,29 +50,30 @@ class NoteService:
         Returns:
             作成されたメモ。
         """
-        with _tracer.start_as_current_span("usecase.note.create"):
-            now = self.clock.now()
-            note = Note(
+        now = self.clock.now()
+        note = Note(
+            id=self.ids.new_id(),
+            owner_id=owner_id,
+            title=title,
+            body=body,
+            created_at=now,
+            updated_at=now,
+        )
+        # operation 1つで span + 業務ログ + 失敗時 span=ERROR が規約準拠で揃う。
+        with operation("note.create") as op:
+            op.set(**{"note.id": note.id})
+            await self.notes.add(note)
+            version = Version(
                 id=self.ids.new_id(),
-                owner_id=owner_id,
+                note_id=note.id,
                 title=title,
                 body=body,
+                parent_id=None,
                 created_at=now,
-                updated_at=now,
             )
-            await self.notes.add(note)
-            await self.versions.add(
-                Version(
-                    id=self.ids.new_id(),
-                    note_id=note.id,
-                    title=title,
-                    body=body,
-                    parent_id=None,
-                    created_at=now,
-                )
-            )
-            _logger.info("note.created", **{"flownote.note.id": note.id})
-            return note
+            await self.versions.add(version)
+            op.set(**{"version.id": version.id})
+        return note
 
     async def get(self, *, owner_id: str, note_id: str) -> Note:
         """所有者のメモを取得する。
@@ -121,7 +120,8 @@ class NoteService:
         Raises:
             NotFoundError: 存在しない、または所有者が異なる場合。
         """
-        with _tracer.start_as_current_span("usecase.note.update"):
+        with operation("note.update") as op:
+            op.set(**{"note.id": note_id})
             current = await self.get(owner_id=owner_id, note_id=note_id)
             now = self.clock.now()
             updated = current.edited(title=title, body=body, now=now)
@@ -129,17 +129,16 @@ class NoteService:
             # 直前バージョンを親として履歴を連結する。
             history = await self.versions.list_by_note(note_id)
             parent_id = history[-1].id if history else None
-            await self.versions.add(
-                Version(
-                    id=self.ids.new_id(),
-                    note_id=note_id,
-                    title=title,
-                    body=body,
-                    parent_id=parent_id,
-                    created_at=now,
-                )
+            version = Version(
+                id=self.ids.new_id(),
+                note_id=note_id,
+                title=title,
+                body=body,
+                parent_id=parent_id,
+                created_at=now,
             )
-            _logger.info("note.updated", **{"flownote.note.id": note_id})
+            await self.versions.add(version)
+            op.set(**{"version.id": version.id})
             return updated
 
     async def delete(self, *, owner_id: str, note_id: str) -> None:
@@ -154,4 +153,5 @@ class NoteService:
         """
         await self.get(owner_id=owner_id, note_id=note_id)
         await self.notes.delete(note_id)
-        _logger.info("note.deleted", **{"flownote.note.id": note_id})
+        # span を張るほどでもない単発イベントは log_event で十分。
+        log_event("note.deleted", **{"note.id": note_id})

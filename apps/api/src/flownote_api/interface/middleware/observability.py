@@ -81,7 +81,8 @@ class ObservabilityMiddleware:
                 "http.server.request.duration": duration_s,
             }
             bound = _logger.bind(**attributes)
-            # 重大度に応じてレベルを選択(4xx=WARN, 5xx=ERROR, それ以外=INFO)。
+            # 重大度に応じてレベルを選択(5xx=ERROR、4xx は §3 の2段階で WARN/INFO、
+            # 2xx/3xx=INFO)。判定は severity_for_http_status を唯一の源泉とする。
             if severity.name == "ERROR":
                 bound.error("http.request.completed")
             elif severity.name == "WARN":

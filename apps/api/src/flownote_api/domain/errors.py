@@ -174,6 +174,11 @@ def error_catalog() -> list[ErrorCatalogEntry]:
 
     OpenAPI 補足やサポート資料の生成元(コード ↔ 意味 ↔ HTTP status の対応表)に用いる。
 
+    Note:
+        列挙は ``__subclasses__()`` に基づくため、**import 済み**の :class:`DomainError`
+        サブクラスのみが対象。サブクラスを別モジュールに定義する場合は、本関数の呼び出し前に
+        当該モジュールが import 済みであることを保証すること(現状は本モジュールに集約)。
+
     Returns:
         全 :class:`DomainError` サブクラスのカタログ項目。
     """

@@ -68,3 +68,18 @@ def test_error_catalog_codes_are_unique_and_cover_subclasses() -> None:
     assert {"RES.NOT_FOUND", "AUTHZ.DENIED", "VAL.INVALID", "RES.CONFLICT"} <= set(codes)
     # カタログはコード昇順で安定している(生成物の差分を小さく保つ)。
     assert codes == sorted(codes)
+
+
+def test_error_catalog_includes_base_internal_fallback() -> None:
+    # 基底 DomainError(GEN.INTERNAL)も未識別例外の公開コードとして列挙される。
+    catalog = error_catalog()
+    internal = next(entry for entry in catalog if entry.code == "GEN.INTERNAL")
+    assert internal.http_status == 500
+    assert internal.source.endswith("DomainError")
+
+
+def test_error_catalog_entries_are_tagged_as_domain() -> None:
+    # ドメイン抽出の全項目は origin=domain で、発行元クラス名を保持する。
+    catalog = error_catalog()
+    assert {entry.origin for entry in catalog} == {"domain"}
+    assert all(entry.source for entry in catalog)

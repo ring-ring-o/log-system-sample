@@ -21,6 +21,7 @@ from opentelemetry import trace
 
 from flownote_api.domain.errors import DomainError, PermissionDeniedError
 from flownote_api.infrastructure.security.token import InvalidTokenError
+from flownote_api.interface.http.error_catalog import AUTH_UNAUTHORIZED, VAL_REQUEST
 from flownote_api.interface.http.problem import ProblemDetail, build_problem
 from flownote_observability import get_logger, severity_for_http_status
 from flownote_observability.severity import Severity
@@ -117,12 +118,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     async def _invalid_token(request: Request, exc: Exception) -> JSONResponse:
         assert isinstance(exc, InvalidTokenError)
-        # セキュリティログは検証箇所で記録済み。ここでは 401 応答のみ。
+        # セキュリティログは検証箇所で記録済み。ここでは 401 応答のみ(コードは境界 SSOT を参照)。
         problem = build_problem(
-            code="AUTH.UNAUTHORIZED",
-            status=401,
-            title="認証が必要です",
-            detail="有効な認証情報が必要です",
+            code=AUTH_UNAUTHORIZED.code,
+            status=AUTH_UNAUTHORIZED.http_status,
+            title=AUTH_UNAUTHORIZED.public_title,
+            detail=AUTH_UNAUTHORIZED.public_detail,
             instance=request.url.path,
             trace_id=_current_trace_id(),
         )
@@ -133,8 +134,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         # 入力検証の失敗は仕様内のクライアント挙動(期待される失敗)。INFO で1件記録。
         _log_boundary(
             "error.handled",
-            code="VAL.REQUEST",
-            status=422,
+            code=VAL_REQUEST.code,
+            status=VAL_REQUEST.http_status,
             internal_context={},
         )
         # フィールド単位の指摘は利用者の修正に必要なため公開する(機密は含めない前提)。
@@ -143,10 +144,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             for err in exc.errors()
         ]
         problem = build_problem(
-            code="VAL.REQUEST",
-            status=422,
-            title="入力が不正です",
-            detail="リクエストの内容を確認してください",
+            code=VAL_REQUEST.code,
+            status=VAL_REQUEST.http_status,
+            title=VAL_REQUEST.public_title,
+            detail=VAL_REQUEST.public_detail,
             instance=request.url.path,
             trace_id=_current_trace_id(),
             errors=errors,
@@ -154,18 +155,19 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _response(problem)
 
     async def _unexpected(request: Request, exc: Exception) -> JSONResponse:
-        # 未捕捉例外は ERROR で記録(exception.* はパイプラインが付与)。内部詳細は応答に出さない。
+        # 未捕捉例外は基底 DomainError(GEN.INTERNAL)へフォールバックする。コード/表題は
+        # ドメインの基底定義を参照し、リテラルの二重管理を避ける(exception.* はパイプライン付与)。
         _log_boundary(
             "error.unhandled",
-            code="GEN.INTERNAL",
-            status=500,
+            code=DomainError.code,
+            status=DomainError.http_status,
             internal_context={},
             exc=exc,
         )
         problem = build_problem(
-            code="GEN.INTERNAL",
-            status=500,
-            title="内部エラーが発生しました",
+            code=DomainError.code,
+            status=DomainError.http_status,
+            title=DomainError.public_title,
             detail="しばらくしてから再度お試しください",
             instance=request.url.path,
             trace_id=_current_trace_id(),

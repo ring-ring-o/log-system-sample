@@ -41,6 +41,11 @@ from flownote_observability.schema import (
     SERVICE_NAME_KEY,
     SERVICE_VERSION_KEY,
 )
+from flownote_observability.semconv import (
+    EXCEPTION_MESSAGE_KEY,
+    EXCEPTION_STACKTRACE_KEY,
+    EXCEPTION_TYPE_KEY,
+)
 from flownote_observability.severity import Severity, severity_from_name
 
 # structlog プロセッサのイベント辞書型。値は任意の Python 値になりうる。
@@ -208,9 +213,9 @@ def _add_exception(_logger: object, _method: str, event_dict: EventDict) -> Even
         formatted = _format_exception(raw)
         if formatted is not None:
             type_name, message, stack = formatted
-            event_dict["exception.type"] = type_name
-            event_dict["exception.message"] = message
-            event_dict["exception.stacktrace"] = stack
+            event_dict[EXCEPTION_TYPE_KEY] = type_name
+            event_dict[EXCEPTION_MESSAGE_KEY] = message
+            event_dict[EXCEPTION_STACKTRACE_KEY] = stack
     return event_dict
 
 

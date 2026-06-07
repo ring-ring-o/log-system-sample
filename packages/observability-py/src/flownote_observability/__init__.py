@@ -24,6 +24,14 @@ from flownote_observability.context import (
     clear_request_context,
     hash_session_id,
 )
+from flownote_observability.conventions import (
+    EventDomain,
+    FinishReason,
+    GenAiContentKind,
+    GenAiOperation,
+    GenAiSystem,
+    GenAiTokenType,
+)
 from flownote_observability.genai import GenAICall, GenAIInstrumentation
 from flownote_observability.logging_setup import (
     configure_logging,
@@ -56,8 +64,14 @@ def bootstrap(config: ObservabilityConfig) -> None:
 __all__ = [
     "AuditOutcome",
     "AuthzDecision",
+    "EventDomain",
+    "FinishReason",
     "GenAICall",
     "GenAIInstrumentation",
+    "GenAiContentKind",
+    "GenAiOperation",
+    "GenAiSystem",
+    "GenAiTokenType",
     "LogRecord",
     "ObservabilityConfig",
     "Operation",

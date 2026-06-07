@@ -10,7 +10,20 @@ from enum import StrEnum
 
 import structlog
 
+from flownote_observability.conventions import EventDomain
 from flownote_observability.logging_setup import get_logger
+from flownote_observability.semconv import (
+    AUDIT_ACTION_KEY,
+    AUDIT_OUTCOME_KEY,
+    AUTHZ_DECISION_KEY,
+    AUTHZ_PERMISSION_KEY,
+    AUTHZ_RESOURCE_KEY,
+    CLIENT_ADDRESS_KEY,
+    EVENT_DOMAIN_KEY,
+    SECURITY_REASON_KEY,
+    USER_ID_KEY,
+    USER_ROLES_KEY,
+)
 
 _logger = get_logger("flownote_observability.audit")
 
@@ -68,20 +81,23 @@ def emit_audit(
         decision: 認可判定(``allow``/``deny``)。
         client_address: 送信元アドレス。
     """
-    attributes: dict[str, object] = {"event.domain": "audit", "audit.action": action}
-    attributes["audit.outcome"] = outcome.value
+    attributes: dict[str, object] = {
+        EVENT_DOMAIN_KEY: EventDomain.AUDIT,
+        AUDIT_ACTION_KEY: action,
+        AUDIT_OUTCOME_KEY: outcome.value,
+    }
     if user_id is not None:
-        attributes["user.id"] = user_id
+        attributes[USER_ID_KEY] = user_id
     if roles is not None:
-        attributes["user.roles"] = roles
+        attributes[USER_ROLES_KEY] = roles
     if resource is not None:
-        attributes["authz.resource"] = resource
+        attributes[AUTHZ_RESOURCE_KEY] = resource
     if permission is not None:
-        attributes["authz.permission"] = permission
+        attributes[AUTHZ_PERMISSION_KEY] = permission
     if decision is not None:
-        attributes["authz.decision"] = decision.value
+        attributes[AUTHZ_DECISION_KEY] = decision.value
     if client_address is not None:
-        attributes["client.address"] = client_address
+        attributes[CLIENT_ADDRESS_KEY] = client_address
 
     _emit(outcome, action, attributes)
 
@@ -104,14 +120,14 @@ def emit_security(
         reason: 失敗理由の分類(``expired``/``invalid_signature`` 等)。
     """
     attributes: dict[str, object] = {
-        "event.domain": "security",
-        "audit.action": action,
-        "audit.outcome": outcome.value,
+        EVENT_DOMAIN_KEY: EventDomain.SECURITY,
+        AUDIT_ACTION_KEY: action,
+        AUDIT_OUTCOME_KEY: outcome.value,
     }
     if client_address is not None:
-        attributes["client.address"] = client_address
+        attributes[CLIENT_ADDRESS_KEY] = client_address
     if reason is not None:
-        attributes["security.reason"] = reason
+        attributes[SECURITY_REASON_KEY] = reason
     _emit(outcome, action, attributes)
 
 

@@ -136,19 +136,27 @@ class ConflictError(DomainError):
 
 @dataclass(frozen=True, slots=True)
 class ErrorCatalogEntry:
-    """エラーカタログの1項目。
+    """エラーカタログの1項目(抽出/突合の単位)。
+
+    ドメイン層が発行するエラーも、インターフェース層(境界)が直接発行するエラーも、
+    同一の形に正規化して扱えるよう共通フィールドに揃える。``origin``/``source`` により
+    抽出結果をレイヤや発行元で**フィルタ・ソート**できる。
 
     Attributes:
-        code: 安定エラー識別子。
+        code: 安定エラー識別子(``<DOMAIN>.<NAME>``)。
         http_status: 既定 HTTP ステータス。
-        public_title: 公開表題。
-        exception: 対応する例外クラスの完全名。
+        public_title: クライアントに見せる短い表題。
+        public_detail: 静的に定まる公開詳細。インスタンス生成時に決まる場合は ``None``。
+        origin: 発行レイヤ(``domain`` / ``interface``)。フィルタの主キー。
+        source: 発行元の完全名(例外クラスやフレームワーク例外の完全修飾名)。
     """
 
     code: str
     http_status: int
     public_title: str
-    exception: str
+    public_detail: str | None
+    origin: str
+    source: str
 
 
 def _iter_subclasses(cls: type[DomainError]) -> list[type[DomainError]]:
@@ -170,25 +178,35 @@ def _iter_subclasses(cls: type[DomainError]) -> list[type[DomainError]]:
 
 
 def error_catalog() -> list[ErrorCatalogEntry]:
-    """既知のドメインエラーを ``code`` で安定ソートしたカタログを返す。
+    """ドメイン層が発行するエラーを ``code`` で安定ソートしたカタログを返す。
 
     OpenAPI 補足やサポート資料の生成元(コード ↔ 意味 ↔ HTTP status の対応表)に用いる。
+    基底 :class:`DomainError` 自身(``GEN.INTERNAL``)も、未識別例外のフォールバックとして
+    クライアントに返る公開コードであるため列挙に含める。
 
     Note:
         列挙は ``__subclasses__()`` に基づくため、**import 済み**の :class:`DomainError`
         サブクラスのみが対象。サブクラスを別モジュールに定義する場合は、本関数の呼び出し前に
         当該モジュールが import 済みであることを保証すること(現状は本モジュールに集約)。
+        境界(interface 層)が直接発行する ``DomainError`` 派生でないコードは本関数では拾えない。
+        ドメイン＋境界を統合した**完全なカタログ**は
+        ``interface.http.error_catalog.full_error_catalog()`` を用いる。
 
     Returns:
-        全 :class:`DomainError` サブクラスのカタログ項目。
+        基底 :class:`DomainError` と全サブクラスのカタログ項目(``origin="domain"``)。
     """
+    # 基底自身(GEN.INTERNAL フォールバック)と全サブクラスを対象にする。
+    classes: list[type[DomainError]] = [DomainError, *_iter_subclasses(DomainError)]
     entries = [
         ErrorCatalogEntry(
-            code=sub.code,
-            http_status=sub.http_status,
-            public_title=sub.public_title,
-            exception=f"{sub.__module__}.{sub.__qualname__}",
+            code=cls.code,
+            http_status=cls.http_status,
+            public_title=cls.public_title,
+            # 公開詳細は多くがインスタンス生成時に確定するため、静的カタログでは None とする。
+            public_detail=None,
+            origin="domain",
+            source=f"{cls.__module__}.{cls.__qualname__}",
         )
-        for sub in _iter_subclasses(DomainError)
+        for cls in classes
     ]
     return sorted(entries, key=lambda entry: entry.code)

@@ -18,6 +18,7 @@ export {
 } from "./trace";
 export { type LogSink, type LoggerOptions, ClientLogger, createBeaconSink } from "./logger";
 export { type FetchFn, createInstrumentedFetch } from "./instrument";
+export { type ProblemDetails, parseProblemDetails } from "./problem";
 export { reportWebVitals } from "./vitals";
 export { registerGlobalErrorHandlers } from "./error";
 

@@ -23,6 +23,10 @@ dependencies = [
 # 本番/compose では PostgreSQL を使う。ローカル/テストは aiosqlite で完結する。
 postgres = ["psycopg[binary]>=3.2"]
 
+[project.scripts]
+# エラーコードの自動抽出(ドメイン＋境界の完全カタログ)。Markdown/JSON/CSV/--check。
+flownote-error-catalog = "flownote_api.interface.cli.error_catalog:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

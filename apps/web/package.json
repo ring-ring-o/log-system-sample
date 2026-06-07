@@ -9,6 +9,8 @@
     "start": "next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "gen:errors": "uv run --package flownote-api flownote-error-catalog --format ts -o src/shared/error-catalog.generated.ts",
+    "check:errors": "uv run --package flownote-api flownote-error-catalog --format ts --check src/shared/error-catalog.generated.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

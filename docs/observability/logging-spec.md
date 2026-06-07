@@ -165,6 +165,22 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 | 公開 | `code` / `public_title` / `public_detail` | クライアント応答（Problem Details）＋ログ |
 | 内部 | `internal_context`（内部ID・原因・SQL等） | **ログのみ**（応答には載せない） |
 
+**コードの命名規則**: `<DOMAIN>.<NAME>`（ともに大文字）。`DOMAIN` は意味領域の接頭辞、`NAME` はその中の具体事象。クラス名は変えてもコードは変えない（公開 API の契約）。現行の接頭辞:
+
+| 接頭辞 | 意味領域 | 例 | 主な HTTP |
+|---|---|---|---|
+| `RES` | リソースの状態（存在/競合） | `RES.NOT_FOUND` / `RES.CONFLICT` | 404 / 409 |
+| `VAL` | 入力検証 | `VAL.INVALID`（ドメイン不変条件） / `VAL.REQUEST`（スキーマ違反） | 422 |
+| `AUTH` | 認証（本人性） | `AUTH.UNAUTHORIZED` | 401 |
+| `AUTHZ` | 認可（権限） | `AUTHZ.DENIED` | 403 |
+| `GEN` | 汎用・未識別のフォールバック | `GEN.INTERNAL` | 500 |
+
+新しい意味領域が必要になったら接頭辞を1つ足し、本表に追記する（例: `RATE`／`DEP`〔依存先障害〕等）。
+
+**抽出（自動）**: クライアントに返る全公開コードは2源泉に分かれる — ①ドメイン例外（`domain/errors.py`、`error_catalog()`、基底 `GEN.INTERNAL` 含む）と、②境界が直接発行するコード（`interface/http/error_catalog.py` の SSOT。`AUTH.UNAUTHORIZED` / `VAL.REQUEST`）。両者を統合した完全カタログは `full_error_catalog()`、コマンドは `flownote-error-catalog`（Markdown/JSON/CSV/**TS**/`--check`）。生成物は [error-catalog.md](./error-catalog.md)、使い方は [apps/api README](../../apps/api/README.md)。
+
+**フロント共有**: フロントはコード集合を手書きせず、`--format ts` で `apps/web/src/shared/error-catalog.generated.ts`（`ErrorCode` union / `ERROR_CATALOG`）を生成して参照する。これによりバック↔フロントでコード集合が一致し、クライアントは安定 `code` で分岐できる（[frontend-logging §3.1](./frontend-logging.md)）。
+
 ### 5.2 クライアント応答は RFC 9457 Problem Details
 
 API がクライアントへ返すエラー本文は `application/problem+json`（[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)）に統一する。実装は `apps/api/.../interface/http/problem.py`。

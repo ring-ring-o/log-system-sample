@@ -58,7 +58,16 @@ raise ValidationError("タイトルは空にできません")  # → 422 + code=
 raise ConflictError("既に存在します", internal_context={"flownote.note.id": note_id})
 ```
 
-- 新しいエラー種別は `domain/errors.py` に `code`/`http_status`/`public_title` を持つ `DomainError` サブクラスを足すだけ。`error_catalog()` に自動で載る。
+- 新しいエラー種別は `domain/errors.py` に `code`/`http_status`/`public_title` を持つ `DomainError` サブクラスを足すだけ。`error_catalog()` に自動で載る。コードの命名規則・接頭辞は [logging-spec §5.1](./logging-spec.md)。
+- **エラーコード一覧が欲しい**（フロント共有・サポート資料・棚卸し）→ 抽出コマンドを使う。手で表を書かない:
+
+```bash
+uv run --package flownote-api flownote-error-catalog                 # Markdown 表（ドメイン＋境界の全コード）
+uv run --package flownote-api flownote-error-catalog --format json   # JSON（フロント共有）
+uv run --package flownote-api flownote-error-catalog --format csv    # CSV
+```
+
+生成物は [error-catalog.md](./error-catalog.md)。CI はコード追加時の追従漏れを `--check` で弾く（[apps/api README](../../apps/api/README.md)）。
 
 ## 4. AI 呼び出しを計装したい
 
@@ -82,6 +91,9 @@ with genai.call(operation="chat", system="openai", request_model=model, use_case
 ## 7. フロントエンド（TS）
 
 `packages/observability-web` の `ClientLogger` と計装済み `fetch` を使う。`traceparent` 付与・`http.client.*`（所要時間は秒）・送出前マスキングは自動（[frontend-logging.md](./frontend-logging.md)）。`console.log` 直出力は禁止。
+
+- **API エラーはコードで分岐**: `shared/api-client.ts` が Problem Details を解析し `ApiError`（`code`/`title`/`detail`/`traceId`）を投げる。`if (e instanceof ApiError && e.code === "VAL.REQUEST")` のように**安定コードで分岐**する（メッセージ文字列に依存しない）。エラーは `flownote.error.code` 付きで自動ログされる。
+- **コード集合は手書きしない**: `pnpm --filter web gen:errors` でバックエンド SSOT から `error-catalog.generated.ts`（`ErrorCode` 型）を生成・参照する（[frontend-logging §3.1](./frontend-logging.md)）。
 
 ## やってはいけない（DX以前の禁止事項）
 

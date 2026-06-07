@@ -78,3 +78,24 @@ AI 呼び出しは `GenAIInstrumentation` で計測する（[genai-observability
 エラーは `domain/errors.py` の `DomainError`（安定コード `code` / `http_status` / 外部公開タイトルを保持）で表現し、
 HTTP 応答は **RFC 9457 Problem Details** に統一する。ログは「**境界で1度だけ**」記録する（[logging-spec §5](../../docs/observability/logging-spec.md)）。
 `ADMIN` ロールは `PUT /admin/log-level` でプロセス再起動なしにログ閾値を変更できる（変更は監査ログに残る）。
+
+### エラーコードの抽出（`flownote-error-catalog`）
+
+クライアントに返る**全公開エラーコード**を1点から抽出するコマンド。源泉はドメイン例外（`domain/errors.py::error_catalog`、基底 `GEN.INTERNAL` 含む）と、境界が直接発行するコード（`interface/http/error_catalog.py` の SSOT＝`AUTH.UNAUTHORIZED` / `VAL.REQUEST`）の統合（`full_error_catalog()`）。各項目は `origin`（`domain`/`interface`）と発行元クラスを持ち、フィルタ・ソートできる。コードの命名規則・接頭辞一覧は [logging-spec §5.1](../../docs/observability/logging-spec.md)。
+
+```bash
+# 出力形式: markdown（既定・ドキュメント生成）/ json（フロント共有）/ csv（表計算・突合）
+uv run --package flownote-api flownote-error-catalog
+uv run --package flownote-api flownote-error-catalog --format json
+uv run --package flownote-api flownote-error-catalog --format csv
+
+# 絞り込み・並べ替え
+uv run --package flownote-api flownote-error-catalog --origin interface   # 境界のみ
+uv run --package flownote-api flownote-error-catalog --sort status        # HTTP 順
+
+# 生成物（コミット済みスナップショット）の再生成と、CI での追従漏れ検査（リポジトリルートから）
+uv run --package flownote-api flownote-error-catalog -o docs/observability/error-catalog.md
+uv run --package flownote-api flownote-error-catalog --check docs/observability/error-catalog.md
+```
+
+新エラーを追加したら生成物を再生成してコミットする。`--check` は現状カタログとスナップショットが食い違うと非ゼロ終了するため、CI に置けば「コード追加時のドキュメント追従漏れ」を弾ける。生成物: [docs/observability/error-catalog.md](../../docs/observability/error-catalog.md)。

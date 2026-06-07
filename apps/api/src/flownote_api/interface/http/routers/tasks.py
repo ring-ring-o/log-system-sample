@@ -6,14 +6,17 @@ from fastapi import APIRouter, Depends
 
 from flownote_api.container import Container
 from flownote_api.domain.identity import Permission, User
+from flownote_api.domain.kinds import EntityType
 from flownote_api.interface.http.schemas import TaskCreate, TaskOut, TaskStatusUpdate
 from flownote_api.interface.security.auth import get_container, require_permission
+from flownote_api.shared.routes import BY_TASK_ID, ROOT, TASK_STATUS, TASKS_PREFIX, RouterTag
+from flownote_api.shared.telemetry import AuditAction
 from flownote_observability import AuditOutcome, emit_audit
 
-router = APIRouter(prefix="/api/tasks", tags=["tasks"])
+router = APIRouter(prefix=TASKS_PREFIX, tags=[RouterTag.TASKS])
 
 
-@router.post("", status_code=201)
+@router.post(ROOT, status_code=201)
 async def create_task(
     payload: TaskCreate,
     user: User = Depends(require_permission(Permission.TASK_WRITE)),
@@ -35,7 +38,7 @@ async def create_task(
     return TaskOut.from_domain(task)
 
 
-@router.get("")
+@router.get(ROOT)
 async def list_tasks(
     user: User = Depends(require_permission(Permission.TASK_READ)),
     container: Container = Depends(get_container),
@@ -53,7 +56,7 @@ async def list_tasks(
     return [TaskOut.from_domain(t) for t in tasks]
 
 
-@router.patch("/{task_id}/status")
+@router.patch(TASK_STATUS)
 async def change_task_status(
     task_id: str,
     payload: TaskStatusUpdate,
@@ -77,7 +80,7 @@ async def change_task_status(
     return TaskOut.from_domain(task)
 
 
-@router.delete("/{task_id}", status_code=204)
+@router.delete(BY_TASK_ID, status_code=204)
 async def delete_task(
     task_id: str,
     user: User = Depends(require_permission(Permission.TASK_DELETE)),
@@ -93,8 +96,8 @@ async def delete_task(
     await container.tasks.delete(owner_id=user.id, task_id=task_id)
     # 機微操作(削除)は監査ログへ([audit-logging] §3)。
     emit_audit(
-        action="task.delete",
+        action=AuditAction.TASK_DELETE,
         outcome=AuditOutcome.SUCCESS,
         user_id=user.id,
-        resource=f"task:{task_id}",
+        resource=EntityType.TASK.resource_id(task_id),
     )

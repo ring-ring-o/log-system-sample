@@ -10,15 +10,25 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from flownote_api.domain.ai import (
+    AIUseCase,
     ChatMessage,
+    ChatRole,
     ConsultResult,
     ProgressInsight,
     SearchDocument,
     SearchHit,
 )
 from flownote_api.domain.errors import NotFoundError
+from flownote_api.domain.kinds import EntityType
 from flownote_api.domain.ports import AIAssistant, NoteRepository, TaskRepository
+from flownote_api.shared.telemetry import (
+    SEARCH_HIT_COUNT_KEY,
+    TASK_STALLED_COUNT_KEY,
+    AppEvent,
+    SpanName,
+)
 from flownote_observability import get_logger, get_tracer
+from flownote_observability.semconv import FLOWNOTE_AI_USE_CASE_KEY
 
 _logger = get_logger("flownote_api.usecases.ai")
 _tracer = get_tracer("flownote_api.usecases.ai")
@@ -57,21 +67,26 @@ class AIService:
         Raises:
             NotFoundError: 指定メモが存在しない/所有者が異なる場合。
         """
-        with _tracer.start_as_current_span("usecase.ai.consult"):
+        with _tracer.start_as_current_span(SpanName.USECASE_AI_CONSULT):
             messages: list[ChatMessage] = [
-                ChatMessage(role="system", content="あなたは作業管理を支援するアシスタントです。")
+                ChatMessage(
+                    role=ChatRole.SYSTEM, content="あなたは作業管理を支援するアシスタントです。"
+                )
             ]
             if note_id is not None:
                 note = await self.notes.get(note_id)
                 if note is None or note.owner_id != owner_id:
-                    raise NotFoundError("note", note_id)
+                    raise NotFoundError(EntityType.NOTE, note_id)
                 context = note.body[:_CONTEXT_BODY_MAX]
                 messages.append(
-                    ChatMessage(role="user", content=f"次のメモを参考にして:\n{context}")
+                    ChatMessage(role=ChatRole.USER, content=f"次のメモを参考にして:\n{context}")
                 )
-            messages.append(ChatMessage(role="user", content=question))
+            messages.append(ChatMessage(role=ChatRole.USER, content=question))
             result = await self.assistant.consult(messages)
-            _logger.info("ai.consult.completed", **{"flownote.ai.use_case": "task_consult"})
+            _logger.info(
+                AppEvent.AI_CONSULT_COMPLETED,
+                **{FLOWNOTE_AI_USE_CASE_KEY: AIUseCase.TASK_CONSULT},
+            )
             return result
 
     async def search(self, *, owner_id: str, query: str) -> list[SearchHit]:
@@ -84,21 +99,23 @@ class AIService:
         Returns:
             関連度順のヒット一覧。
         """
-        with _tracer.start_as_current_span("usecase.ai.search"):
+        with _tracer.start_as_current_span(SpanName.USECASE_AI_SEARCH):
             notes = await self.notes.list_by_owner(owner_id)
             tasks = await self.tasks.list_by_owner(owner_id)
             documents: list[SearchDocument] = [
-                SearchDocument(kind="note", id=n.id, title=n.title, text=n.body) for n in notes
+                SearchDocument(kind=EntityType.NOTE, id=n.id, title=n.title, text=n.body)
+                for n in notes
             ]
             documents += [
-                SearchDocument(kind="task", id=t.id, title=t.title, text=t.title) for t in tasks
+                SearchDocument(kind=EntityType.TASK, id=t.id, title=t.title, text=t.title)
+                for t in tasks
             ]
             hits = await self.assistant.search(query, documents)
             _logger.info(
-                "ai.search.completed",
+                AppEvent.AI_SEARCH_COMPLETED,
                 **{
-                    "flownote.ai.use_case": "unified_search",
-                    "flownote.search.hit_count": len(hits),
+                    FLOWNOTE_AI_USE_CASE_KEY: AIUseCase.UNIFIED_SEARCH,
+                    SEARCH_HIT_COUNT_KEY: len(hits),
                 },
             )
             return hits
@@ -112,14 +129,14 @@ class AIService:
         Returns:
             進捗の洞察。
         """
-        with _tracer.start_as_current_span("usecase.ai.review_progress"):
+        with _tracer.start_as_current_span(SpanName.USECASE_AI_REVIEW_PROGRESS):
             tasks = await self.tasks.list_by_owner(owner_id)
             insight = await self.assistant.review_progress(tasks)
             _logger.info(
-                "ai.progress.reviewed",
+                AppEvent.AI_PROGRESS_REVIEWED,
                 **{
-                    "flownote.ai.use_case": "progress_review",
-                    "flownote.task.stalled_count": len(insight.stalled_task_ids),
+                    FLOWNOTE_AI_USE_CASE_KEY: AIUseCase.PROGRESS_REVIEW,
+                    TASK_STALLED_COUNT_KEY: len(insight.stalled_task_ids),
                 },
             )
             return insight

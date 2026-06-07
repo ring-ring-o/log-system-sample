@@ -23,13 +23,14 @@ from flownote_api.domain.errors import DomainError, PermissionDeniedError
 from flownote_api.infrastructure.security.token import InvalidTokenError
 from flownote_api.interface.http.error_catalog import AUTH_UNAUTHORIZED, VAL_REQUEST
 from flownote_api.interface.http.problem import ProblemDetail, build_problem
+from flownote_api.shared.http_constants import MediaType
+from flownote_api.shared.telemetry import AppEvent
 from flownote_observability import get_logger, severity_for_http_status
+from flownote_observability.conventions import EventDomain
+from flownote_observability.semconv import EVENT_DOMAIN_KEY, FLOWNOTE_ERROR_CODE_KEY
 from flownote_observability.severity import Severity
 
 _logger = get_logger("flownote_api.errors")
-
-# RFC 9457 の MIME タイプ。
-_PROBLEM_JSON = "application/problem+json"
 
 
 def _current_trace_id() -> str | None:
@@ -54,7 +55,7 @@ def _response(problem: ProblemDetail) -> JSONResponse:
     return JSONResponse(
         status_code=problem.status,
         content=problem.model_dump(exclude_none=True),
-        media_type=_PROBLEM_JSON,
+        media_type=MediaType.PROBLEM_JSON,
     )
 
 
@@ -79,7 +80,9 @@ def _log_boundary(
         exc: 5xx 等でスタックトレースを残す対象例外(任意)。
     """
     severity = severity_for_http_status(status)
-    bound = _logger.bind(**{"event.domain": "app", "flownote.error.code": code, **internal_context})
+    bound = _logger.bind(
+        **{EVENT_DOMAIN_KEY: EventDomain.APP, FLOWNOTE_ERROR_CODE_KEY: code, **internal_context}
+    )
     if severity is Severity.ERROR:
         bound.error(body, exc_info=exc)
     elif severity is Severity.WARN:
@@ -100,7 +103,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         # 認可拒否は auth 層で監査済み。二重ログを避ける。
         if not isinstance(exc, PermissionDeniedError):
             _log_boundary(
-                "error.handled",
+                AppEvent.ERROR_HANDLED,
                 code=exc.code,
                 status=exc.http_status,
                 internal_context=exc.internal_context,
@@ -133,7 +136,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         assert isinstance(exc, RequestValidationError)
         # 入力検証の失敗は仕様内のクライアント挙動(期待される失敗)。INFO で1件記録。
         _log_boundary(
-            "error.handled",
+            AppEvent.ERROR_HANDLED,
             code=VAL_REQUEST.code,
             status=VAL_REQUEST.http_status,
             internal_context={},
@@ -158,7 +161,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         # 未捕捉例外は基底 DomainError(GEN.INTERNAL)へフォールバックする。コード/表題は
         # ドメインの基底定義を参照し、リテラルの二重管理を避ける(exception.* はパイプライン付与)。
         _log_boundary(
-            "error.unhandled",
+            AppEvent.ERROR_UNHANDLED,
             code=DomainError.code,
             status=DomainError.http_status,
             internal_context={},

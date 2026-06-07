@@ -6,14 +6,17 @@ from fastapi import APIRouter, Depends
 
 from flownote_api.container import Container
 from flownote_api.domain.identity import Permission, User
+from flownote_api.domain.kinds import EntityType
 from flownote_api.interface.http.schemas import NoteCreate, NoteOut, NoteUpdate
 from flownote_api.interface.security.auth import get_container, require_permission
+from flownote_api.shared.routes import BY_NOTE_ID, NOTES_PREFIX, ROOT, RouterTag
+from flownote_api.shared.telemetry import AuditAction
 from flownote_observability import AuditOutcome, emit_audit
 
-router = APIRouter(prefix="/api/notes", tags=["notes"])
+router = APIRouter(prefix=NOTES_PREFIX, tags=[RouterTag.NOTES])
 
 
-@router.post("", status_code=201)
+@router.post(ROOT, status_code=201)
 async def create_note(
     payload: NoteCreate,
     user: User = Depends(require_permission(Permission.NOTE_WRITE)),
@@ -33,7 +36,7 @@ async def create_note(
     return NoteOut.from_domain(note)
 
 
-@router.get("")
+@router.get(ROOT)
 async def list_notes(
     user: User = Depends(require_permission(Permission.NOTE_READ)),
     container: Container = Depends(get_container),
@@ -51,7 +54,7 @@ async def list_notes(
     return [NoteOut.from_domain(n) for n in notes]
 
 
-@router.get("/{note_id}")
+@router.get(BY_NOTE_ID)
 async def get_note(
     note_id: str,
     user: User = Depends(require_permission(Permission.NOTE_READ)),
@@ -71,7 +74,7 @@ async def get_note(
     return NoteOut.from_domain(note)
 
 
-@router.put("/{note_id}")
+@router.put(BY_NOTE_ID)
 async def update_note(
     note_id: str,
     payload: NoteUpdate,
@@ -95,7 +98,7 @@ async def update_note(
     return NoteOut.from_domain(note)
 
 
-@router.delete("/{note_id}", status_code=204)
+@router.delete(BY_NOTE_ID, status_code=204)
 async def delete_note(
     note_id: str,
     user: User = Depends(require_permission(Permission.NOTE_DELETE)),
@@ -111,8 +114,8 @@ async def delete_note(
     await container.notes.delete(owner_id=user.id, note_id=note_id)
     # 機微操作(削除)は監査ログへ([audit-logging] §3)。
     emit_audit(
-        action="note.delete",
+        action=AuditAction.NOTE_DELETE,
         outcome=AuditOutcome.SUCCESS,
         user_id=user.id,
-        resource=f"note:{note_id}",
+        resource=EntityType.NOTE.resource_id(note_id),
     )

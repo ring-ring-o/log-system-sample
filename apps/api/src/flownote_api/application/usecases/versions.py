@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from flownote_api.domain.errors import NotFoundError
+from flownote_api.domain.kinds import EntityType
 from flownote_api.domain.ports import (
     Clock,
     IdGenerator,
@@ -12,6 +13,7 @@ from flownote_api.domain.ports import (
     VersionRepository,
 )
 from flownote_api.domain.versions import Version, compute_unified_diff
+from flownote_api.shared.telemetry import NOTE_ID_KEY, VERSION_ID_KEY, AppEvent, SpanName
 from flownote_observability import get_logger, get_tracer
 
 _logger = get_logger("flownote_api.usecases.versions")
@@ -46,7 +48,7 @@ class VersionService:
         """
         note = await self.notes.get(note_id)
         if note is None or note.owner_id != owner_id:
-            raise NotFoundError("note", note_id)
+            raise NotFoundError(EntityType.NOTE, note_id)
 
     async def list(self, *, owner_id: str, note_id: str) -> list[Version]:
         """メモのバージョン履歴を返す。
@@ -86,7 +88,7 @@ class VersionService:
             (to_version_id, to_version),
         ):
             if version is None or version.note_id != note_id:
-                raise NotFoundError("version", version_id)
+                raise NotFoundError(EntityType.VERSION, version_id)
         assert from_version is not None  # 上のループで None を除外済み(型の絞り込み)
         assert to_version is not None
         return compute_unified_diff(from_version.body, to_version.body)
@@ -107,13 +109,13 @@ class VersionService:
         Raises:
             NotFoundError: メモまたはバージョンが存在しない場合。
         """
-        with _tracer.start_as_current_span("usecase.version.restore"):
+        with _tracer.start_as_current_span(SpanName.USECASE_VERSION_RESTORE):
             note = await self.notes.get(note_id)
             if note is None or note.owner_id != owner_id:
-                raise NotFoundError("note", note_id)
+                raise NotFoundError(EntityType.NOTE, note_id)
             source = await self.versions.get(version_id)
             if source is None or source.note_id != note_id:
-                raise NotFoundError("version", version_id)
+                raise NotFoundError(EntityType.VERSION, version_id)
 
             now = self.clock.now()
             updated_note = note.edited(title=source.title, body=source.body, now=now)
@@ -130,7 +132,7 @@ class VersionService:
             )
             await self.versions.add(restored)
             _logger.info(
-                "note.version.restored",
-                **{"flownote.note.id": note_id, "flownote.version.id": version_id},
+                AppEvent.NOTE_VERSION_RESTORED,
+                **{NOTE_ID_KEY: note_id, VERSION_ID_KEY: version_id},
             )
             return restored

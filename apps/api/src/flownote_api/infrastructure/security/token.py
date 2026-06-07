@@ -14,6 +14,13 @@ from typing import Protocol
 import jwt
 
 from flownote_api.domain.identity import Role
+from flownote_api.shared.http_constants import TokenFailureReason
+
+# JWT 検証の署名アルゴリズムと、参照する OIDC クレーム名(プロトコル語彙)。
+_JWT_ALGORITHM = "RS256"
+_CLAIM_SUBJECT = "sub"
+_CLAIM_REALM_ACCESS = "realm_access"
+_CLAIM_ROLES = "roles"
 
 
 class InvalidTokenError(Exception):
@@ -107,7 +114,7 @@ class DevTokenVerifier:
             InvalidTokenError: トークンが空の場合。
         """
         if not token.strip():
-            raise InvalidTokenError("empty")
+            raise InvalidTokenError(TokenFailureReason.EMPTY)
         subject, _, roles_part = token.partition(":")
         if roles_part:
             roles = _parse_roles([r.strip() for r in roles_part.split(",")])
@@ -150,24 +157,24 @@ class KeycloakJwtVerifier:
             claims: dict[str, object] = jwt.decode(
                 token,
                 signing_key.key,
-                algorithms=["RS256"],
+                algorithms=[_JWT_ALGORITHM],
                 audience=self._audience,
                 issuer=self._issuer,
             )
         except jwt.ExpiredSignatureError as exc:
-            raise InvalidTokenError("expired") from exc
+            raise InvalidTokenError(TokenFailureReason.EXPIRED) from exc
         except jwt.InvalidSignatureError as exc:
-            raise InvalidTokenError("invalid_signature") from exc
+            raise InvalidTokenError(TokenFailureReason.INVALID_SIGNATURE) from exc
         except jwt.InvalidAudienceError as exc:
-            raise InvalidTokenError("invalid_audience") from exc
+            raise InvalidTokenError(TokenFailureReason.INVALID_AUDIENCE) from exc
         except jwt.InvalidIssuerError as exc:
-            raise InvalidTokenError("invalid_issuer") from exc
+            raise InvalidTokenError(TokenFailureReason.INVALID_ISSUER) from exc
         except jwt.PyJWTError as exc:
-            raise InvalidTokenError("invalid") from exc
+            raise InvalidTokenError(TokenFailureReason.INVALID) from exc
 
-        subject = claims.get("sub")
+        subject = claims.get(_CLAIM_SUBJECT)
         if not isinstance(subject, str):
-            raise InvalidTokenError("missing_subject")
-        realm_access = claims.get("realm_access")
-        raw_roles = realm_access.get("roles") if isinstance(realm_access, dict) else None
+            raise InvalidTokenError(TokenFailureReason.MISSING_SUBJECT)
+        realm_access = claims.get(_CLAIM_REALM_ACCESS)
+        raw_roles = realm_access.get(_CLAIM_ROLES) if isinstance(realm_access, dict) else None
         return VerifiedToken(subject=subject, roles=_parse_roles(raw_roles))

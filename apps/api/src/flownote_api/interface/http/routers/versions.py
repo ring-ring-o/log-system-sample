@@ -8,11 +8,18 @@ from flownote_api.container import Container
 from flownote_api.domain.identity import Permission, User
 from flownote_api.interface.http.schemas import DiffOut, VersionOut
 from flownote_api.interface.security.auth import get_container, require_permission
+from flownote_api.shared.routes import (
+    ROOT,
+    VERSION_DIFF,
+    VERSION_RESTORE,
+    VERSIONS_PREFIX,
+    RouterTag,
+)
 
-router = APIRouter(prefix="/api/notes/{note_id}/versions", tags=["versions"])
+router = APIRouter(prefix=VERSIONS_PREFIX, tags=[RouterTag.VERSIONS])
 
 
-@router.get("")
+@router.get(ROOT)
 async def list_versions(
     note_id: str,
     user: User = Depends(require_permission(Permission.NOTE_READ)),
@@ -32,7 +39,7 @@ async def list_versions(
     return [VersionOut.from_domain(v) for v in versions]
 
 
-@router.get("/diff")
+@router.get(VERSION_DIFF)
 async def diff_versions(
     note_id: str,
     from_version: str,
@@ -61,7 +68,7 @@ async def diff_versions(
     return DiffOut(diff=diff)
 
 
-@router.post("/{version_id}/restore", status_code=201)
+@router.post(VERSION_RESTORE, status_code=201)
 async def restore_version(
     note_id: str,
     version_id: str,

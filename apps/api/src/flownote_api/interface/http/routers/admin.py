@@ -16,9 +16,14 @@ from pydantic import BaseModel
 
 from flownote_api.domain.identity import Permission, User
 from flownote_api.interface.security.auth import require_permission
+from flownote_api.shared.routes import ADMIN_PREFIX, LOG_LEVEL, RouterTag
+from flownote_api.shared.telemetry import AuditAction
 from flownote_observability import AuditOutcome, emit_audit, get_log_level, set_log_level
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+# 監査ログの資源識別子の種別(``log_level:<値>``)。EntityType ではない運用資源。
+_LOG_LEVEL_RESOURCE = "log_level"
+
+router = APIRouter(prefix=ADMIN_PREFIX, tags=[RouterTag.ADMIN])
 
 
 class LogLevelOut(BaseModel):
@@ -33,7 +38,7 @@ class LogLevelUpdate(BaseModel):
     level: str
 
 
-@router.get("/log-level")
+@router.get(LOG_LEVEL)
 async def read_log_level(
     _user: User = Depends(require_permission(Permission.ADMIN_MANAGE)),
 ) -> LogLevelOut:
@@ -48,7 +53,7 @@ async def read_log_level(
     return LogLevelOut(level=get_log_level())
 
 
-@router.put("/log-level")
+@router.put(LOG_LEVEL)
 async def update_log_level(
     payload: LogLevelUpdate,
     user: User = Depends(require_permission(Permission.ADMIN_MANAGE)),
@@ -65,9 +70,9 @@ async def update_log_level(
     set_log_level(payload.level)
     applied = get_log_level()
     emit_audit(
-        action="admin.log_level.change",
+        action=AuditAction.ADMIN_LOG_LEVEL_CHANGE,
         outcome=AuditOutcome.SUCCESS,
         user_id=user.id,
-        resource=f"log_level:{applied}",
+        resource=f"{_LOG_LEVEL_RESOURCE}:{applied}",
     )
     return LogLevelOut(level=applied)

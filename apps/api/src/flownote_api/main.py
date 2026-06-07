@@ -55,7 +55,14 @@ from flownote_api.infrastructure.security.token import (
 from flownote_api.interface.http.routers import admin, ai, health, notes, tasks, versions
 from flownote_api.interface.middleware.errors import register_exception_handlers
 from flownote_api.interface.middleware.observability import ObservabilityMiddleware
-from flownote_api.settings import Settings
+from flownote_api.settings import AiBackend, AuthMode, RepoBackend, Settings
+from flownote_api.shared.http_constants import CORS_ALLOW_HEADERS, CORS_ALLOW_METHODS
+from flownote_api.shared.telemetry import (
+    AI_BACKEND_KEY,
+    AUTH_MODE_KEY,
+    REPO_BACKEND_KEY,
+    AppEvent,
+)
 from flownote_observability import GenAIInstrumentation, ObservabilityConfig, bootstrap, get_logger
 
 _logger = get_logger("flownote_api.main")
@@ -75,7 +82,7 @@ def _build_repositories(
     Returns:
         (メモ, バージョン, タスク) のリポジトリ。
     """
-    if settings.repo_backend == "memory":
+    if settings.repo_backend == RepoBackend.MEMORY:
         return (
             InMemoryNoteRepository(),
             InMemoryVersionRepository(),
@@ -100,7 +107,7 @@ def _build_token_verifier(settings: Settings) -> TokenVerifier:
     Returns:
         ``dev`` なら開発用、``oidc`` なら Keycloak 検証器。
     """
-    if settings.auth_mode == "oidc":
+    if settings.auth_mode == AuthMode.OIDC:
         return KeycloakJwtVerifier(
             jwks_url=settings.oidc_jwks_url,
             issuer=settings.oidc_issuer,
@@ -127,7 +134,7 @@ def build_container(
     clock = SystemClock()
     ids = UuidGenerator()
 
-    if settings.ai_backend == "openai":
+    if settings.ai_backend == AiBackend.OPENAI:
         assistant: StubAIAssistant | OpenAICompatibleAssistant = OpenAICompatibleAssistant(
             genai,
             base_url=settings.ai_base_url,
@@ -170,7 +177,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # SQL バックエンド時はエンジンを1本だけ生成し、起動〜終了で共有・破棄する。
         engine: AsyncEngine | None = None
-        if resolved.repo_backend == "sql":
+        if resolved.repo_backend == RepoBackend.SQL:
             if resolved.database_url.startswith("sqlite") and ":///" in resolved.database_url:
                 Path(".tmp").mkdir(exist_ok=True)
             engine = create_engine(resolved.database_url)
@@ -181,11 +188,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # deployment.environment.name はリソース属性として全ログに自動付与されるため、
         # ここでは重複させず業務固有の構成のみ記録する。
         _logger.info(
-            "app.started",
+            AppEvent.APP_STARTED,
             **{
-                "flownote.repo_backend": resolved.repo_backend,
-                "flownote.ai_backend": resolved.ai_backend,
-                "flownote.auth_mode": resolved.auth_mode,
+                REPO_BACKEND_KEY: resolved.repo_backend,
+                AI_BACKEND_KEY: resolved.ai_backend,
+                AUTH_MODE_KEY: resolved.auth_mode,
             },
         )
         try:
@@ -201,9 +208,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolved.cors_origins,
-        # 最小権限: 実際に用いる method/header に限定する。
-        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-        allow_headers=["authorization", "content-type", "x-request-id", "traceparent"],
+        # 最小権限: 実際に用いる method/header に限定する(shared.http_constants の SSOT)。
+        allow_methods=list(CORS_ALLOW_METHODS),
+        allow_headers=list(CORS_ALLOW_HEADERS),
     )
     register_exception_handlers(app)
     for module in (health, notes, tasks, versions, ai, admin):

@@ -6,6 +6,7 @@
  * {@link ../../../docs/observability/frontend-logging.md} 参照。
  */
 
+import { CONTENT_TYPE, HEADER, HTTP_METHOD } from "./constants";
 import { redact } from "./redaction";
 import type { ClientLogRecord, ResourceInfo } from "./schema";
 import { buildRecord } from "./schema";
@@ -108,9 +109,9 @@ export function createBeaconSink(endpoint: string): LogSink {
       return;
     }
     void fetch(endpoint, {
-      method: "POST",
+      method: HTTP_METHOD.POST,
       body: payload,
-      headers: { "content-type": "application/json" },
+      headers: { [HEADER.CONTENT_TYPE]: CONTENT_TYPE.JSON },
       keepalive: true,
     });
   };

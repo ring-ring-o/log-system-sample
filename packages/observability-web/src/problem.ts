@@ -6,6 +6,8 @@
  * アプリ固有の安定コード集合はフロント側で型付けする(本パッケージはコードを知らない)。
  */
 
+import { CONTENT_TYPE, HEADER } from "./constants";
+
 /** RFC 9457 Problem Details の本文(拡張メンバ `code`/`trace_id` を含む)。 */
 export interface ProblemDetails {
   /** エラー種別を識別する URI。 */
@@ -25,7 +27,7 @@ export interface ProblemDetails {
 }
 
 /** Problem Details として扱う content-type の判定に使う部分文字列。 */
-const PROBLEM_CONTENT_TYPES = ["application/problem+json", "application/json"];
+const PROBLEM_CONTENT_TYPES = [CONTENT_TYPE.PROBLEM_JSON, CONTENT_TYPE.JSON];
 
 /**
  * 応答本文を Problem Details として安全に解析する。
@@ -37,7 +39,7 @@ const PROBLEM_CONTENT_TYPES = ["application/problem+json", "application/json"];
  * @returns 解析できた場合は {@link ProblemDetails}、できなければ `null`。
  */
 export async function parseProblemDetails(response: Response): Promise<ProblemDetails | null> {
-  const contentType = response.headers.get("content-type") ?? "";
+  const contentType = response.headers.get(HEADER.CONTENT_TYPE) ?? "";
   if (!PROBLEM_CONTENT_TYPES.some((type) => contentType.includes(type))) {
     return null;
   }

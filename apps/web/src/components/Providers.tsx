@@ -16,6 +16,7 @@ import { SessionProvider } from "next-auth/react";
 import { type ReactNode, useEffect } from "react";
 
 import { getClientLogger } from "@/shared/observability";
+import { WEB_EVENT } from "@/shared/telemetry";
 
 /**
  * アプリ全体を包むプロバイダ。
@@ -29,7 +30,7 @@ export function Providers({ children }: { children: ReactNode }) {
     startPageTrace();
     const logger = getClientLogger();
     reportWebVitals(logger);
-    logger.info("web.app.mounted");
+    logger.info(WEB_EVENT.APP_MOUNTED);
     // 未捕捉エラーを記録し、アンマウント時に解除する。
     return registerGlobalErrorHandlers(logger);
   }, []);

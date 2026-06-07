@@ -5,7 +5,9 @@
  * 構造化ログに記録する({@link ../../../docs/observability/frontend-logging.md} §3)。
  */
 
+import { CLIENT_ATTR, CLIENT_EVENT, HEADER, HTTP_METHOD } from "./constants";
 import type { ClientLogger } from "./logger";
+import { ATTR } from "./semconv";
 import { severityForHttpStatus } from "./severity";
 import { buildTraceparent, childTraceContext } from "./trace";
 
@@ -24,9 +26,9 @@ export function createInstrumentedFetch(logger: ClientLogger, baseFetch: FetchFn
     // ページトレースの子 span として発番し、ログとバックエンドを同一 trace に束ねる。
     const trace = childTraceContext();
     const headers = new Headers(init?.headers);
-    headers.set("traceparent", buildTraceparent(trace));
+    headers.set(HEADER.TRACEPARENT, buildTraceparent(trace));
 
-    const method = (init?.method ?? "GET").toUpperCase();
+    const method = (init?.method ?? HTTP_METHOD.GET).toUpperCase();
     const url = typeof input === "string" ? input : input.toString();
     const startedAt = now();
 
@@ -34,13 +36,13 @@ export function createInstrumentedFetch(logger: ClientLogger, baseFetch: FetchFn
       const response = await baseFetch(input, { ...init, headers });
       logger.log(
         severityForHttpStatus(response.status),
-        "http.client.request",
+        CLIENT_EVENT.HTTP_CLIENT_REQUEST,
         {
-          "http.request.method": method,
-          "url.path": toPath(url),
-          "http.response.status_code": response.status,
+          [ATTR.HTTP_REQUEST_METHOD]: method,
+          [ATTR.URL_PATH]: toPath(url),
+          [ATTR.HTTP_RESPONSE_STATUS_CODE]: response.status,
           // OTel 準拠で単位は秒(UCUM `s`)。ミリ秒計測値を 1000 で割って秒へ。
-          "http.client.request.duration": Math.round(now() - startedAt) / 1000,
+          [CLIENT_ATTR.HTTP_CLIENT_REQUEST_DURATION]: Math.round(now() - startedAt) / 1000,
         },
         trace,
       );
@@ -48,11 +50,11 @@ export function createInstrumentedFetch(logger: ClientLogger, baseFetch: FetchFn
     } catch (error) {
       logger.log(
         "ERROR",
-        "http.client.error",
+        CLIENT_EVENT.HTTP_CLIENT_ERROR,
         {
-          "http.request.method": method,
-          "url.path": toPath(url),
-          "error.type": error instanceof Error ? error.name : "unknown",
+          [ATTR.HTTP_REQUEST_METHOD]: method,
+          [ATTR.URL_PATH]: toPath(url),
+          [ATTR.ERROR_TYPE]: error instanceof Error ? error.name : "unknown",
         },
         trace,
       );

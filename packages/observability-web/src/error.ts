@@ -5,6 +5,7 @@
  * ({@link ../../../docs/observability/frontend-logging.md} §2)。
  */
 
+import { CLIENT_ATTR, CLIENT_EVENT } from "./constants";
 import type { ClientLogger } from "./logger";
 
 /**
@@ -15,16 +16,16 @@ import type { ClientLogger } from "./logger";
  */
 export function registerGlobalErrorHandlers(logger: ClientLogger): () => void {
   const onError = (event: ErrorEvent): void => {
-    logger.error("client.unhandled_error", {
-      "exception.type": event.error instanceof Error ? event.error.name : "Error",
-      "exception.message": event.message,
+    logger.error(CLIENT_EVENT.UNHANDLED_ERROR, {
+      [CLIENT_ATTR.EXCEPTION_TYPE]: event.error instanceof Error ? event.error.name : "Error",
+      [CLIENT_ATTR.EXCEPTION_MESSAGE]: event.message,
     });
   };
   const onRejection = (event: PromiseRejectionEvent): void => {
     const reason = event.reason;
-    logger.error("client.unhandled_rejection", {
-      "exception.type": reason instanceof Error ? reason.name : "UnhandledRejection",
-      "exception.message": reason instanceof Error ? reason.message : String(reason),
+    logger.error(CLIENT_EVENT.UNHANDLED_REJECTION, {
+      [CLIENT_ATTR.EXCEPTION_TYPE]: reason instanceof Error ? reason.name : "UnhandledRejection",
+      [CLIENT_ATTR.EXCEPTION_MESSAGE]: reason instanceof Error ? reason.message : String(reason),
     });
   };
 

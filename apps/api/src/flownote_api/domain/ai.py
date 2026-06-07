@@ -24,16 +24,33 @@ class AIUseCase(StrEnum):
     PROGRESS_REVIEW = "progress_review"
 
 
+class ChatRole(StrEnum):
+    """会話メッセージの役割(``gen_ai`` メッセージの role)。
+
+    ``gen_ai.system``(プロバイダ系統)とは別意図のドメイン概念。ドメインは外向き依存ゼロのため
+    観測ライブラリではなく本層に置く。
+
+    Attributes:
+        SYSTEM: システムプロンプト。
+        USER: ユーザー入力。
+        ASSISTANT: アシスタント応答。
+    """
+
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
 @dataclass(frozen=True, slots=True)
 class ChatMessage:
     """会話メッセージ。
 
     Attributes:
-        role: 役割(``system``/``user``/``assistant``)。
+        role: 役割(:class:`ChatRole`)。
         content: 本文。
     """
 
-    role: str
+    role: ChatRole
     content: str
 
 

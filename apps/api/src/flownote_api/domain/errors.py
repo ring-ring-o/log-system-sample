@@ -18,6 +18,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# エラー文脈(internal_context)で用いる属性キー。ドメインは外向き依存ゼロのため
+# observability の semconv を import せず、ここで定義する(値が semconv と一致することは
+# テストで機械保証する。[tests] 参照)。
+ENTITY_KEY = "flownote.entity"
+ENTITY_ID_KEY = "flownote.entity_id"
+AUTHZ_PERMISSION_KEY = "authz.permission"
+AUTHZ_RESOURCE_KEY = "authz.resource"
+
 
 class DomainError(Exception):
     """ドメイン層の基底例外。
@@ -81,7 +89,7 @@ class NotFoundError(DomainError):
         self.entity_id = entity_id
         super().__init__(
             public_detail=f"{entity} が見つかりません",
-            internal_context={"flownote.entity": entity, "flownote.entity_id": entity_id},
+            internal_context={ENTITY_KEY: entity, ENTITY_ID_KEY: entity_id},
         )
 
 
@@ -106,9 +114,9 @@ class PermissionDeniedError(DomainError):
         """
         self.permission = permission
         self.resource = resource
-        context: dict[str, object] = {"authz.permission": permission}
+        context: dict[str, object] = {AUTHZ_PERMISSION_KEY: permission}
         if resource is not None:
-            context["authz.resource"] = resource
+            context[AUTHZ_RESOURCE_KEY] = resource
         super().__init__(
             public_detail="この操作を行う権限がありません",
             internal_context=context,

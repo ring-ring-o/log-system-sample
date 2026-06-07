@@ -12,6 +12,7 @@ import {
   ClientLogger,
   createInstrumentedFetch,
   newTraceContext,
+  parseProblemDetails,
   redact,
 } from "../src/index.js";
 
@@ -135,5 +136,43 @@ describe("createInstrumentedFetch", () => {
     const errorLog = records.find((r) => r.body === "http.client.error");
     expect(errorLog?.severity_text).toBe("ERROR");
     expect(errorLog?.attributes["error.type"]).toBe("TypeError");
+  });
+});
+
+describe("parseProblemDetails", () => {
+  it("problem+json の本文から code/trace_id を取り出す", async () => {
+    const response = new Response(
+      JSON.stringify({ code: "RES.NOT_FOUND", title: "見つかりません", trace_id: "abc" }),
+      { status: 404, headers: { "content-type": "application/problem+json" } },
+    );
+    const problem = await parseProblemDetails(response);
+    expect(problem?.code).toBe("RES.NOT_FOUND");
+    expect(problem?.trace_id).toBe("abc");
+  });
+
+  it("本文を消費せず、呼び出し側が再度読める(clone)", async () => {
+    const response = new Response(JSON.stringify({ code: "VAL.REQUEST" }), {
+      status: 422,
+      headers: { "content-type": "application/json" },
+    });
+    await parseProblemDetails(response);
+    // 元の応答本文は未読のまま(parse は clone を読む)。
+    expect(response.bodyUsed).toBe(false);
+  });
+
+  it("JSON でない応答は null を返す", async () => {
+    const response = new Response("oops", {
+      status: 500,
+      headers: { "content-type": "text/plain" },
+    });
+    expect(await parseProblemDetails(response)).toBeNull();
+  });
+
+  it("不正な JSON でも例外を投げず null を返す", async () => {
+    const response = new Response("{not json", {
+      status: 500,
+      headers: { "content-type": "application/problem+json" },
+    });
+    expect(await parseProblemDetails(response)).toBeNull();
   });
 });

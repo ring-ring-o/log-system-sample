@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "gen:errors": "uv run --package flownote-api flownote-error-catalog --format ts -o src/shared/error-catalog.generated.ts",
     "check:errors": "uv run --package flownote-api flownote-error-catalog --format ts --check src/shared/error-catalog.generated.ts",
+    "gen:telemetry": "uv run --package flownote-api flownote-telemetry-catalog --target routes -o src/shared/routes.generated.ts && uv run --package flownote-api flownote-telemetry-catalog --target semconv -o ../../packages/observability-web/src/semconv.ts",
+    "check:telemetry": "uv run --package flownote-api flownote-telemetry-catalog --target routes --check src/shared/routes.generated.ts && uv run --package flownote-api flownote-telemetry-catalog --target semconv --check ../../packages/observability-web/src/semconv.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

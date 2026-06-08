@@ -1,0 +1,39 @@
+# Docker ビルドコンテキスト除外設定。
+# build context は repo ルート(infra/compose.yaml の context: ..)であるため、
+# ランタイム生成物・ボリューム・依存物を除外して転送を軽量化し、権限エラーを防ぐ。
+
+# ランタイムが root 所有で生成するバインドマウント先(これが原因の permission denied を回避)
+infra/volumes/
+
+# バージョン管理・IDE
+.git
+.gitignore
+.devcontainer
+**/.vscode
+**/.idea
+
+# Python
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+
+# Node / Next.js(イメージ内で install/build し直すため取り込まない)
+**/node_modules
+**/.next
+**/.turbo
+**/storybook-static
+
+# テスト/ビルドの中間成果物
+**/*.tsbuildinfo
+**/coverage
+
+# ログ・OS 雑多ファイル
+**/*.log
+**/.DS_Store
+
+# Docker 関連自体
+**/Dockerfile
+.dockerignore

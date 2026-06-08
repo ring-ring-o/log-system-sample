@@ -37,12 +37,89 @@ uv run --package flownote-ai-mock uvicorn flownote_ai_mock.main:app --port 8001
 pnpm --filter web dev
 ```
 
+## フルスタック起動(api/web 込みで compose 一括)
+
+アプリ(`api`)とフロント(`web`)もコンテナで立ち上げ、観測スタックまで含めて一括で動かす場合。
+`compose.yaml` の `api`/`web` は `depends_on` で `postgres`/`ai-mock`/`otel-collector` を待つため、
+サービス名を列挙せず**全サービスを起動**すればよい(初回はイメージ build が走る)。
+
+```bash
+# 観測スタック + api + web を含む全サービスを起動(build 込み)。
+docker compose -f infra/compose.yaml up -d --build
+
+# 起動状況とヘルスを確認。
+docker compose -f infra/compose.yaml ps
+```
+
+- アクセス: web=http://localhost:3000 / api=http://localhost:8000 / keycloak=http://localhost:8080。
+- 停止: `docker compose -f infra/compose.yaml down`(データ込みで消すなら `-v` を付与。ただし `volumes/` は別途残る)。
+- このモードでは `api`/`web` は**コンテナ内**で動くため、ローカルコマンド起動とはログの出所が変わる(下記)。
+- 既定の `api` コンテナは `FLOWNOTE_ENV=dev`・`FLOWNOTE_AUTH_MODE=oidc`(Keycloak 検証)で動く。
+  認証を介さず疎通だけ見たい場合は `compose.yaml` の `api.environment` で `FLOWNOTE_AUTH_MODE=dev` に上書きする。
+
 ## ログ/トレース/メトリクスの観察
 
-- **コンソール**: `FLOWNOTE_OTEL_CONSOLE=1` でトレース/メトリクスを標準出力にも出力。構造化ログは常に標準出力(JSON)。
-- **Collector経由**: `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` を設定するとトレース/メトリクスが Collector に届き、
-  `./volumes/otel-output/otel-output.jsonl`(file exporter)と Collector ログ(debug exporter)で確認できる。
-- **相関**: ログとトレースは `trace_id`/`span_id` で結びつく。1リクエストの `trace_id` で横断追跡できる。
+可観測性は **2 つの面**に分かれる。①構造化ログ(JSON)は各プロセスの**標準出力**に出る。
+②トレース/メトリクス(と任意でログ)は **OTLP** で otel-collector に送られ、`debug`/`file` exporter で確認する。
+どこを見るかは「ローカルコマンド起動」か「フルスタック compose 起動」かで変わる。
+
+### ① 構造化ログ(JSON / 標準出力)
+
+- **ローカルコマンド起動**: 各コマンドを実行した**ターミナルの標準出力**に直接出る。
+- **フルスタック compose 起動**: コンテナの標準出力に出るため、Docker のログドライバ経由で集約する。
+
+  ```bash
+  # 全サービスを追従(JSON ログ)。
+  docker compose -f infra/compose.yaml logs -f
+
+  # api / web に絞って追従。
+  docker compose -f infra/compose.yaml logs -f api web
+  ```
+
+  実体は各コンテナの json-file ログ(ホストの `/var/lib/docker/containers/<id>/<id>-json.log`)。
+  本番ではこの**標準出力を tail する agent**(filelog receiver / Fluent Bit 等)で集約する想定(12-factor、
+  [ADR 0005](../docs/adr/0005-log-transport.md))。compose でこの集約まで再現したい場合は後述「ログを Collector に集約する」を参照。
+
+### ② トレース/メトリクス(OTLP → otel-collector)
+
+- 送出先は環境変数 `OTEL_EXPORTER_OTLP_ENDPOINT` で決まる。
+  - ローカルコマンド起動: `http://localhost:4318`(ホストから Collector へ)。
+  - フルスタック compose 起動: `api` コンテナは compose ネットワーク内の `http://otel-collector:4318`(`compose.yaml` に設定済み)。
+- web の**ブラウザ側**ログ/トレースは `NEXT_PUBLIC_OTLP_ENDPOINT`(既定 `http://localhost:4318`)へ beacon/fetch で送る。
+  ブラウザはホスト上で動くため、コンテナ起動でもホストの `localhost:4318`(= Collector の公開ポート)を指す。
+- Collector に届いたデータの確認先:
+  - **file exporter**: `./volumes/otel-output/otel-output.jsonl`(`tail -f` で観察)。
+  - **debug exporter**: `docker compose -f infra/compose.yaml logs -f otel-collector`。
+- **相関**: ①のログと②のトレースは `trace_id`/`span_id` で結びつく。1リクエストの `trace_id` で①②を横断追跡できる。
+
+### ログを Collector に集約する(任意・compose での本番相当の集約)
+
+標準出力の JSON ログまで otel-collector に集約したい場合は、Collector に **filelog receiver** を追加し、
+コンテナの json-file ログを読み取らせる(`docker compose logs` で十分なら不要)。
+`otel-collector/config.yaml` に以下を追記する例:
+
+```yaml
+receivers:
+  filelog:
+    include: [/var/lib/docker/containers/*/*-json.log]
+    operators:
+      # Docker json-file ドライバの 1 行 = {"log":"...","stream":"...","time":"..."}。
+      - type: json_parser
+      # アプリが出す構造化ログ本体(JSON 文字列)をさらに展開する。
+      - type: json_parser
+        parse_from: attributes.log
+service:
+  pipelines:
+    logs:
+      receivers: [otlp, filelog]   # OTLP に加えて標準出力ログも取り込む
+      processors: [memory_limiter, resource, batch]
+      exporters: [debug, file]
+```
+
+併せて `compose.yaml` の `otel-collector` に
+`- /var/lib/docker/containers:/var/lib/docker/containers:ro` をボリュームマウントする。
+これでコンテナ標準出力の JSON ログも `./volumes/otel-output/otel-output.jsonl` に集約される。
+（ホストの Docker ログパスは環境差があるため、確実に観察したいだけなら `docker compose logs` を基本線とする。）
 
 ## SigNoz(任意・重量級)
 

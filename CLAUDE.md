@@ -59,9 +59,12 @@ pnpm --filter web storybook               # Storybook
 
 ### インフラ（ベストエフォート）
 ```bash
-docker compose -f infra/compose.yaml up -d postgres keycloak otel-collector ai-mock
+docker compose -f infra/compose.yaml up -d postgres keycloak otel-collector ai-mock  # 観測スタック+周辺のみ
+docker compose -f infra/compose.yaml up -d --build            # api/web 込みで一括起動（フルスタック）
+docker compose -f infra/compose.yaml logs -f api web          # コンテナ標準出力のJSONログを追従
 docker compose -f infra/compose.yaml --profile signoz up -d   # SigNozは重い
 ```
+ログの出所（コンテナ標準出力 / OTLP→otel-collector）と集約設定は [infra/README.md](./infra/README.md) を参照。
 
 ## 4. コーディング規約（バックエンド）
 

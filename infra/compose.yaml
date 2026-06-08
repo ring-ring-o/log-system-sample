@@ -1,7 +1,9 @@
 # FlowNote ローカル構成。
 # 開発時はアプリをローカルコマンドで起動してもよい(コンテナにこだわりすぎない)。
-# 例: docker compose -f infra/compose.yaml up -d postgres keycloak otel-collector ai-mock
-#     SigNoz を含める場合: docker compose -f infra/compose.yaml --profile signoz up -d
+# 例(観測スタックのみ): docker compose -f infra/compose.yaml up -d postgres keycloak otel-collector ai-mock
+#     api/web 込みで一括起動:  docker compose -f infra/compose.yaml up -d --build
+#     SigNoz を含める場合:      docker compose -f infra/compose.yaml --profile signoz up -d
+# ログの出所と集約方法(コンテナ標準出力 / OTLP)は infra/README.md「ログ/トレース/メトリクスの観察」を参照。
 name: flownote
 
 services:

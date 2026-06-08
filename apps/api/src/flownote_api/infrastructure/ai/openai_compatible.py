@@ -13,17 +13,37 @@ import httpx
 from pydantic import BaseModel, ConfigDict
 
 from flownote_api.domain.ai import (
+    AIUseCase,
     ChatMessage,
+    ChatRole,
     ConsultResult,
     ProgressInsight,
     SearchDocument,
     SearchHit,
 )
 from flownote_api.domain.tasks import Task, TaskStatus
+from flownote_api.shared.http_constants import (
+    BEARER_PREFIX,
+    HeaderName,
+    UpstreamPath,
+)
+from flownote_api.shared.telemetry import AiErrorType
 from flownote_observability import GenAIInstrumentation
+from flownote_observability.conventions import FinishReason, GenAiOperation, GenAiSystem
 
 # AI 呼び出しのタイムアウト(秒)。超過時は error.type=timeout とする。
 _TIMEOUT_S = 30.0
+
+# OpenAI 互換 API のリクエストボディのフィールド名(上流プロトコル語彙)。
+_FIELD_MODEL = "model"
+_FIELD_MESSAGES = "messages"
+_FIELD_ROLE = "role"
+_FIELD_CONTENT = "content"
+_FIELD_INPUT = "input"
+
+# レート制限を表す上流ステータス。
+_HTTP_TOO_MANY_REQUESTS = 429
+_HTTP_SERVER_ERROR_MIN = 500
 
 
 class _Usage(BaseModel):
@@ -103,7 +123,7 @@ class OpenAICompatibleAssistant:
         chat_model: str,
         embedding_model: str,
         api_key: str | None = None,
-        system: str = "vllm",
+        system: str = GenAiSystem.VLLM,
     ) -> None:
         """接続情報と計装を注入して初期化する。
 
@@ -119,7 +139,9 @@ class OpenAICompatibleAssistant:
         self._base_url = base_url.rstrip("/")
         self._chat_model = chat_model
         self._embedding_model = embedding_model
-        self._headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        self._headers: dict[str, str] = (
+            {HeaderName.AUTHORIZATION: f"{BEARER_PREFIX}{api_key}"} if api_key else {}
+        )
         self._system = system
 
     async def _post(self, path: str, payload: dict[str, object]) -> httpx.Response:
@@ -152,13 +174,17 @@ class OpenAICompatibleAssistant:
             ``timeout``/``rate_limit``/``upstream_5xx``/``upstream_4xx``/``error`` のいずれか。
         """
         if isinstance(exc, httpx.TimeoutException):
-            return "timeout"
+            return AiErrorType.TIMEOUT
         if isinstance(exc, httpx.HTTPStatusError):
             status = exc.response.status_code
-            if status == 429:
-                return "rate_limit"
-            return "upstream_5xx" if status >= 500 else "upstream_4xx"
-        return "error"
+            if status == _HTTP_TOO_MANY_REQUESTS:
+                return AiErrorType.RATE_LIMIT
+            return (
+                AiErrorType.UPSTREAM_5XX
+                if status >= _HTTP_SERVER_ERROR_MIN
+                else AiErrorType.UPSTREAM_4XX
+            )
+        return AiErrorType.ERROR
 
     async def consult(self, messages: list[ChatMessage]) -> ConsultResult:
         """chat completions で相談へ応答する。
@@ -170,17 +196,19 @@ class OpenAICompatibleAssistant:
             AI の応答。
         """
         with self._genai.call(
-            operation="chat",
+            operation=GenAiOperation.CHAT,
             system=self._system,
             request_model=self._chat_model,
-            use_case="task_consult",
+            use_case=AIUseCase.TASK_CONSULT,
         ) as call:
             try:
                 response = await self._post(
-                    "/v1/chat/completions",
+                    UpstreamPath.CHAT_COMPLETIONS,
                     {
-                        "model": self._chat_model,
-                        "messages": [{"role": m.role, "content": m.content} for m in messages],
+                        _FIELD_MODEL: self._chat_model,
+                        _FIELD_MESSAGES: [
+                            {_FIELD_ROLE: m.role, _FIELD_CONTENT: m.content} for m in messages
+                        ],
                     },
                 )
             except Exception as exc:
@@ -212,15 +240,16 @@ class OpenAICompatibleAssistant:
         if not documents:
             return []
         with self._genai.call(
-            operation="embeddings",
+            operation=GenAiOperation.EMBEDDINGS,
             system=self._system,
             request_model=self._embedding_model,
-            use_case="unified_search",
+            use_case=AIUseCase.UNIFIED_SEARCH,
         ) as call:
             inputs = [query] + [f"{d.title}\n{d.text}" for d in documents]
             try:
                 response = await self._post(
-                    "/v1/embeddings", {"model": self._embedding_model, "input": inputs}
+                    UpstreamPath.EMBEDDINGS,
+                    {_FIELD_MODEL: self._embedding_model, _FIELD_INPUT: inputs},
                 )
             except Exception as exc:
                 call.error_type = self._classify_error(exc)
@@ -265,15 +294,18 @@ class OpenAICompatibleAssistant:
             "進捗の要約と次の一手を簡潔に述べてください。"
         )
         with self._genai.call(
-            operation="chat",
+            operation=GenAiOperation.CHAT,
             system=self._system,
             request_model=self._chat_model,
-            use_case="progress_review",
+            use_case=AIUseCase.PROGRESS_REVIEW,
         ) as call:
             try:
                 response = await self._post(
-                    "/v1/chat/completions",
-                    {"model": self._chat_model, "messages": [{"role": "user", "content": prompt}]},
+                    UpstreamPath.CHAT_COMPLETIONS,
+                    {
+                        _FIELD_MODEL: self._chat_model,
+                        _FIELD_MESSAGES: [{_FIELD_ROLE: ChatRole.USER, _FIELD_CONTENT: prompt}],
+                    },
                 )
             except Exception as exc:
                 call.error_type = self._classify_error(exc)
@@ -284,7 +316,9 @@ class OpenAICompatibleAssistant:
                 input_tokens=parsed.usage.prompt_tokens,
                 output_tokens=parsed.usage.completion_tokens,
             )
-            call.record_response(model=parsed.model or self._chat_model, finish_reasons=["stop"])
+            call.record_response(
+                model=parsed.model or self._chat_model, finish_reasons=[FinishReason.STOP]
+            )
             return ProgressInsight(
                 summary=summary or "進捗を確認しました。",
                 stalled_task_ids=stalled,

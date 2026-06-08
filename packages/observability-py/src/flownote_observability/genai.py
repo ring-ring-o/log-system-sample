@@ -16,8 +16,33 @@ from opentelemetry import metrics, trace
 from opentelemetry.trace import Span, StatusCode
 
 from flownote_observability.config import ObservabilityConfig
+from flownote_observability.conventions import EventDomain, GenAiTokenType
 from flownote_observability.logging_setup import get_logger
 from flownote_observability.redaction import redact
+from flownote_observability.semconv import (
+    ERROR_TYPE_KEY,
+    ERROR_TYPE_NONE,
+    EVENT_DOMAIN_KEY,
+    FLOWNOTE_AI_COST_METRIC,
+    FLOWNOTE_AI_REQUEST_COUNT_METRIC,
+    FLOWNOTE_AI_USE_CASE_KEY,
+    GEN_AI_OPERATION_DURATION_METRIC,
+    GEN_AI_OPERATION_NAME_KEY,
+    GEN_AI_REQUEST_MAX_TOKENS_KEY,
+    GEN_AI_REQUEST_MODEL_KEY,
+    GEN_AI_REQUEST_TEMPERATURE_KEY,
+    GEN_AI_RESPONSE_FINISH_REASONS_KEY,
+    GEN_AI_RESPONSE_MODEL_KEY,
+    GEN_AI_SYSTEM_KEY,
+    GEN_AI_TOKEN_TYPE_KEY,
+    GEN_AI_TOKEN_USAGE_METRIC,
+    GEN_AI_USAGE_INPUT_TOKENS_KEY,
+    GEN_AI_USAGE_OUTPUT_TOKENS_KEY,
+)
+
+# GenAI 本文ログのイベント名と、本文ペイロードを格納する属性キー(本ライブラリのみが発行)。
+_CONTENT_EVENT = "gen_ai.content"
+_CONTENT_PAYLOAD_KEY = "content"
 
 # モデル別の概算単価(1KトークンあたりのUSD)。ローカル/自前モデルは 0。
 # 運用感覚を学ぶための擬似値であり、設定で上書きしてよい。
@@ -78,16 +103,16 @@ class GenAIInstrumentation:
         self._tracer = self.tracer or trace.get_tracer("flownote_observability.genai")
         meter = self.meter or metrics.get_meter("flownote_observability.genai")
         self._token_usage = meter.create_histogram(
-            "gen_ai.client.token.usage", unit="{token}", description="AI トークン使用量"
+            GEN_AI_TOKEN_USAGE_METRIC, unit="{token}", description="AI トークン使用量"
         )
         self._duration = meter.create_histogram(
-            "gen_ai.client.operation.duration", unit="s", description="AI 呼び出し時間"
+            GEN_AI_OPERATION_DURATION_METRIC, unit="s", description="AI 呼び出し時間"
         )
         self._cost = meter.create_histogram(
-            "flownote.ai.cost.estimate", unit="USD", description="AI 概算コスト"
+            FLOWNOTE_AI_COST_METRIC, unit="USD", description="AI 概算コスト"
         )
         self._count = meter.create_counter(
-            "flownote.ai.request.count", description="AI 呼び出し回数"
+            FLOWNOTE_AI_REQUEST_COUNT_METRIC, description="AI 呼び出し回数"
         )
 
     def _estimate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
@@ -136,24 +161,24 @@ class GenAIInstrumentation:
         """
         span_name = f"{operation} {request_model}"
         with self._tracer.start_as_current_span(span_name) as span:
-            span.set_attribute("gen_ai.operation.name", operation)
-            span.set_attribute("gen_ai.system", system)
-            span.set_attribute("gen_ai.request.model", request_model)
-            span.set_attribute("flownote.ai.use_case", use_case)
+            span.set_attribute(GEN_AI_OPERATION_NAME_KEY, operation)
+            span.set_attribute(GEN_AI_SYSTEM_KEY, system)
+            span.set_attribute(GEN_AI_REQUEST_MODEL_KEY, request_model)
+            span.set_attribute(FLOWNOTE_AI_USE_CASE_KEY, use_case)
             if temperature is not None:
-                span.set_attribute("gen_ai.request.temperature", temperature)
+                span.set_attribute(GEN_AI_REQUEST_TEMPERATURE_KEY, temperature)
             if max_tokens is not None:
-                span.set_attribute("gen_ai.request.max_tokens", max_tokens)
+                span.set_attribute(GEN_AI_REQUEST_MAX_TOKENS_KEY, max_tokens)
 
             record = GenAICall(span=span, request_model=request_model)
-            error_type = "none"
+            error_type = ERROR_TYPE_NONE
             try:
                 yield record
             except Exception as exc:
                 # 失敗分類。呼び出し側が明示していなければ例外型名を用いる。
                 error_type = record.error_type or type(exc).__qualname__
                 span.set_status(StatusCode.ERROR)
-                span.set_attribute("error.type", error_type)
+                span.set_attribute(ERROR_TYPE_KEY, error_type)
                 raise
             finally:
                 self._finalize(span, record, use_case, error_type)
@@ -168,23 +193,23 @@ class GenAIInstrumentation:
             error_type: 失敗分類(``none`` なら成功)。
         """
         response_model = record.response_model or record.request_model
-        span.set_attribute("gen_ai.response.model", response_model)
-        span.set_attribute("gen_ai.usage.input_tokens", record.input_tokens)
-        span.set_attribute("gen_ai.usage.output_tokens", record.output_tokens)
+        span.set_attribute(GEN_AI_RESPONSE_MODEL_KEY, response_model)
+        span.set_attribute(GEN_AI_USAGE_INPUT_TOKENS_KEY, record.input_tokens)
+        span.set_attribute(GEN_AI_USAGE_OUTPUT_TOKENS_KEY, record.output_tokens)
         if record.finish_reasons:
-            span.set_attribute("gen_ai.response.finish_reasons", list(record.finish_reasons))
+            span.set_attribute(GEN_AI_RESPONSE_FINISH_REASONS_KEY, list(record.finish_reasons))
 
         common_attrs: dict[str, str] = {
-            "gen_ai.request.model": record.request_model,
-            "flownote.ai.use_case": use_case,
-            "error.type": error_type,
+            GEN_AI_REQUEST_MODEL_KEY: record.request_model,
+            FLOWNOTE_AI_USE_CASE_KEY: use_case,
+            ERROR_TYPE_KEY: error_type,
         }
         self._count.add(1, common_attrs)
         self._token_usage.record(
-            record.input_tokens, {**common_attrs, "gen_ai.token.type": "input"}
+            record.input_tokens, {**common_attrs, GEN_AI_TOKEN_TYPE_KEY: GenAiTokenType.INPUT}
         )
         self._token_usage.record(
-            record.output_tokens, {**common_attrs, "gen_ai.token.type": "output"}
+            record.output_tokens, {**common_attrs, GEN_AI_TOKEN_TYPE_KEY: GenAiTokenType.OUTPUT}
         )
         cost = self._estimate_cost(response_model, record.input_tokens, record.output_tokens)
         self._cost.record(cost, common_attrs)
@@ -198,8 +223,12 @@ class GenAIInstrumentation:
                 }
             )
             self.logger.info(
-                "gen_ai.content",
-                **{"event.domain": "genai", "flownote.ai.use_case": use_case, "content": safe},
+                _CONTENT_EVENT,
+                **{
+                    EVENT_DOMAIN_KEY: EventDomain.GENAI,
+                    FLOWNOTE_AI_USE_CASE_KEY: use_case,
+                    _CONTENT_PAYLOAD_KEY: safe,
+                },
             )
 
 

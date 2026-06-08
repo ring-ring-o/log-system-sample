@@ -15,6 +15,8 @@ from flownote_api.container import Container
 from flownote_api.domain.errors import PermissionDeniedError
 from flownote_api.domain.identity import Permission, User
 from flownote_api.infrastructure.security.token import InvalidTokenError
+from flownote_api.shared.http_constants import AuthScheme, HeaderName, TokenFailureReason
+from flownote_api.shared.telemetry import AuditAction, SecurityAction
 from flownote_observability import (
     AuditOutcome,
     AuthzDecision,
@@ -53,10 +55,10 @@ def _bearer_token(request: Request) -> str:
     Raises:
         InvalidTokenError: ヘッダが無い/形式不正の場合。
     """
-    header = request.headers.get("authorization", "")
+    header = request.headers.get(HeaderName.AUTHORIZATION, "")
     scheme, _, token = header.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise InvalidTokenError("missing_bearer")
+    if scheme.lower() != AuthScheme.BEARER or not token:
+        raise InvalidTokenError(TokenFailureReason.MISSING)
     return token
 
 
@@ -82,7 +84,11 @@ async def get_current_user(request: Request, container: Container = Depends(get_
         verified = await container.token_verifier.verify(token)
     except InvalidTokenError as exc:
         # 攻撃検知のためセキュリティログへ(主体不明でも記録)。
-        emit_security(action="auth.token.verify", reason=exc.reason, client_address=client_address)
+        emit_security(
+            action=SecurityAction.AUTH_TOKEN_VERIFY,
+            reason=exc.reason,
+            client_address=client_address,
+        )
         raise
     user = User(id=verified.subject, roles=verified.roles)
     # 認証主体を文脈束縛し、以降のログに user.id を相関させる。
@@ -99,7 +105,7 @@ def _request_id(request: Request) -> str:
     Returns:
         request_id 文字列。
     """
-    value = request.headers.get("x-request-id")
+    value = request.headers.get(HeaderName.REQUEST_ID)
     return value if value else cast("str", getattr(request.state, "request_id", ""))
 
 
@@ -119,7 +125,7 @@ def require_permission(
         client_address = request.client.host if request.client else None
         if not user.has_permission(permission):
             emit_audit(
-                action="authz.decision",
+                action=AuditAction.AUTHZ_DECISION,
                 outcome=AuditOutcome.DENIED,
                 user_id=user.id,
                 roles=[r.value for r in user.roles],
@@ -132,7 +138,7 @@ def require_permission(
         # access ログに委ね、監査ログの膨張を避ける。拒否は上で必ず記録済み。
         if permission in _SENSITIVE_PERMISSIONS:
             emit_audit(
-                action="authz.decision",
+                action=AuditAction.AUTHZ_DECISION,
                 outcome=AuditOutcome.SUCCESS,
                 user_id=user.id,
                 roles=[r.value for r in user.roles],

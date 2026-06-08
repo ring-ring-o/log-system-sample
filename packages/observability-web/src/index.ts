@@ -6,6 +6,15 @@
  */
 
 export { redact } from "./redaction";
+export { type AttrName, ATTR } from "./semconv";
+export {
+  CLIENT_ATTR,
+  CLIENT_EVENT,
+  CONTENT_TYPE,
+  HEADER,
+  HTTP_METHOD,
+  VITAL_ATTR,
+} from "./constants";
 export { type SeverityText, SEVERITY_NUMBER, severityForHttpStatus } from "./severity";
 export { type ClientLogRecord, type ResourceInfo, buildRecord } from "./schema";
 export {

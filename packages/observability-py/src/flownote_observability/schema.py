@@ -8,14 +8,27 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# OTel リソース属性のドット区切りキー(トップレベル)。
-SERVICE_NAME_KEY = "service.name"
-SERVICE_VERSION_KEY = "service.version"
-# OTel Stable 化で `deployment.environment` は `deployment.environment.name` に rename された。
-DEPLOYMENT_ENVIRONMENT_KEY = "deployment.environment.name"
+# OTel リソース属性/スキーマメタのキーは semconv(SSOT)を再エクスポートする。
+# alias 用リテラル(下記 Field)はこれらと一致させること(テストで機械保証)。
+from flownote_observability.semconv import (
+    DEPLOYMENT_ENVIRONMENT_KEY,
+    LOG_SCHEMA_VERSION_KEY,
+    SERVICE_NAME_KEY,
+    SERVICE_VERSION_KEY,
+)
+
 # ログスキーマのバージョン。規約進化時に ETL/パース側が世代を判別できるよう必須で付与する。
-LOG_SCHEMA_VERSION_KEY = "flownote.log.schema_version"
 LOG_SCHEMA_VERSION = "1"
+
+__all__ = [
+    "DEPLOYMENT_ENVIRONMENT_KEY",
+    "LOG_SCHEMA_VERSION",
+    "LOG_SCHEMA_VERSION_KEY",
+    "RESERVED_TOP_LEVEL_KEYS",
+    "SERVICE_NAME_KEY",
+    "SERVICE_VERSION_KEY",
+    "LogRecord",
+]
 
 
 class LogRecord(BaseModel):

@@ -4,6 +4,7 @@
  * バックエンドの {@link ../../../docs/observability/logging-spec.md} §2 と整合する形に整形する。
  */
 
+import { ATTR } from "./semconv";
 import type { SeverityText } from "./severity";
 import { SEVERITY_NUMBER } from "./severity";
 
@@ -21,8 +22,8 @@ export interface ClientLogRecord {
   "service.name": string;
   /** バージョン。 */
   "service.version": string;
-  /** 環境。 */
-  "deployment.environment": string;
+  /** 環境(OTel Stable: `deployment.environment.name`。BE/SSOT と一致)。 */
+  "deployment.environment.name": string;
   /** 相関トレースID。 */
   trace_id: string | null;
   /** 相関スパンID。 */
@@ -63,9 +64,9 @@ export function buildRecord(params: {
     severity_text: params.severity,
     severity_number: SEVERITY_NUMBER[params.severity],
     body: params.body,
-    "service.name": params.resource.serviceName,
-    "service.version": params.resource.serviceVersion,
-    "deployment.environment": params.resource.environment,
+    [ATTR.SERVICE_NAME]: params.resource.serviceName,
+    [ATTR.SERVICE_VERSION]: params.resource.serviceVersion,
+    [ATTR.DEPLOYMENT_ENVIRONMENT]: params.resource.environment,
     trace_id: params.trace?.traceId ?? null,
     span_id: params.trace?.spanId ?? null,
     attributes: params.attributes,

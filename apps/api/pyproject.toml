@@ -26,6 +26,8 @@ postgres = ["psycopg[binary]>=3.2"]
 [project.scripts]
 # エラーコードの自動抽出(ドメイン＋境界の完全カタログ)。Markdown/JSON/CSV/--check。
 flownote-error-catalog = "flownote_api.interface.cli.error_catalog:main"
+# FE/BE 共有テレメトリ語彙(ルート/属性キー)の TypeScript 生成。--target routes|semconv。
+flownote-telemetry-catalog = "flownote_api.interface.cli.telemetry_catalog:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -15,11 +15,12 @@ from flownote_api.interface.http.schemas import (
     SearchRequest,
 )
 from flownote_api.interface.security.auth import get_container, require_permission
+from flownote_api.shared.routes import AI_CONSULT, AI_PREFIX, AI_PROGRESS, AI_SEARCH, RouterTag
 
-router = APIRouter(prefix="/api/ai", tags=["ai"])
+router = APIRouter(prefix=AI_PREFIX, tags=[RouterTag.AI])
 
 
-@router.post("/consult")
+@router.post(AI_CONSULT)
 async def consult(
     payload: ConsultRequest,
     user: User = Depends(require_permission(Permission.AI_USE)),
@@ -41,7 +42,7 @@ async def consult(
     return ConsultOut(message=result.message, model=result.model)
 
 
-@router.post("/search")
+@router.post(AI_SEARCH)
 async def search(
     payload: SearchRequest,
     user: User = Depends(require_permission(Permission.AI_USE)),
@@ -66,7 +67,7 @@ async def search(
     )
 
 
-@router.get("/progress")
+@router.get(AI_PROGRESS)
 async def review_progress(
     user: User = Depends(require_permission(Permission.AI_USE)),
     container: Container = Depends(get_container),

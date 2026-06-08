@@ -8,6 +8,7 @@
 import type { Metric } from "web-vitals";
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 
+import { CLIENT_EVENT, VITAL_ATTR } from "./constants";
 import type { ClientLogger } from "./logger";
 
 /**
@@ -17,10 +18,10 @@ import type { ClientLogger } from "./logger";
  */
 export function reportWebVitals(logger: ClientLogger): void {
   const handler = (metric: Metric): void => {
-    logger.info("web.vital", {
-      "flownote.web.vital.name": metric.name,
-      "flownote.web.vital.value": Math.round(metric.value * 1000) / 1000,
-      "flownote.web.vital.rating": metric.rating,
+    logger.info(CLIENT_EVENT.WEB_VITAL, {
+      [VITAL_ATTR.NAME]: metric.name,
+      [VITAL_ATTR.VALUE]: Math.round(metric.value * 1000) / 1000,
+      [VITAL_ATTR.RATING]: metric.rating,
     });
   };
   onCLS(handler);

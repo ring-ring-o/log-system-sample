@@ -12,6 +12,8 @@ import {
   getPageTrace,
 } from "@flownote/observability-web";
 
+import { DEFAULT_ENV, WEB_SERVICE_NAME } from "./telemetry";
+
 let cached: ClientLogger | null = null;
 
 /**
@@ -35,9 +37,9 @@ export function getClientLogger(): ClientLogger {
   const endpoint = process.env.NEXT_PUBLIC_OTLP_ENDPOINT;
   cached = new ClientLogger({
     resource: {
-      serviceName: "flownote-web",
+      serviceName: WEB_SERVICE_NAME,
       serviceVersion: "0.1.0",
-      environment: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV ?? "local",
+      environment: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV ?? DEFAULT_ENV,
     },
     // 収集先があれば OTLP(ログ)へ、無ければコンソールへ。
     sink: endpoint ? createBeaconSink(`${endpoint}/v1/logs`) : consoleSink,

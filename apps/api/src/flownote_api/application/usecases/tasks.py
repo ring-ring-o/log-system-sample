@@ -5,8 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from flownote_api.domain.errors import NotFoundError
+from flownote_api.domain.kinds import EntityType
 from flownote_api.domain.ports import Clock, IdGenerator, TaskRepository
 from flownote_api.domain.tasks import Task, TaskStatus
+from flownote_api.shared.telemetry import (
+    TASK_ID_KEY,
+    TASK_STATUS_KEY,
+    AppEvent,
+    SpanName,
+)
 from flownote_observability import get_logger, get_tracer
 
 _logger = get_logger("flownote_api.usecases.tasks")
@@ -38,7 +45,7 @@ class TaskService:
         Returns:
             作成されたタスク。
         """
-        with _tracer.start_as_current_span("usecase.task.create"):
+        with _tracer.start_as_current_span(SpanName.USECASE_TASK_CREATE):
             now = self.clock.now()
             task = Task(
                 id=self.ids.new_id(),
@@ -51,8 +58,8 @@ class TaskService:
             )
             await self.tasks.add(task)
             _logger.info(
-                "task.created",
-                **{"flownote.task.id": task.id, "flownote.task.status": task.status.value},
+                AppEvent.TASK_CREATED,
+                **{TASK_ID_KEY: task.id, TASK_STATUS_KEY: task.status.value},
             )
             return task
 
@@ -71,7 +78,7 @@ class TaskService:
         """
         task = await self.tasks.get(task_id)
         if task is None or task.owner_id != owner_id:
-            raise NotFoundError("task", task_id)
+            raise NotFoundError(EntityType.TASK, task_id)
         return task
 
     async def list(self, *, owner_id: str) -> list[Task]:
@@ -103,10 +110,10 @@ class TaskService:
         updated = current.with_status(status, now=self.clock.now())
         await self.tasks.update(updated)
         _logger.info(
-            "task.status.changed",
+            AppEvent.TASK_STATUS_CHANGED,
             **{
-                "flownote.task.id": task_id,
-                "flownote.task.status": status.value,
+                TASK_ID_KEY: task_id,
+                TASK_STATUS_KEY: status.value,
             },
         )
         return updated
@@ -123,4 +130,4 @@ class TaskService:
         """
         await self.get(owner_id=owner_id, task_id=task_id)
         await self.tasks.delete(task_id)
-        _logger.info("task.deleted", **{"flownote.task.id": task_id})
+        _logger.info(AppEvent.TASK_DELETED, **{TASK_ID_KEY: task_id})

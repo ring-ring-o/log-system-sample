@@ -5,10 +5,19 @@
  * これによりフロント操作からバックエンドまで同一 `trace_id` で追跡できる。
  */
 
-import { createInstrumentedFetch, parseProblemDetails } from "@flownote/observability-web";
+import {
+  ATTR,
+  CONTENT_TYPE,
+  HEADER,
+  HTTP_METHOD,
+  createInstrumentedFetch,
+  parseProblemDetails,
+} from "@flownote/observability-web";
 
 import type { ErrorCode } from "./error-catalog.generated";
 import { getClientLogger } from "./observability";
+import { API_ROUTES } from "./routes.generated";
+import { BEARER_PREFIX, WEB_EVENT } from "./telemetry";
 
 /**
  * API エラーの安定コード。バックエンド SSOT から生成した {@link ErrorCode} を既知値とし、
@@ -82,8 +91,8 @@ export function createApiClient(getToken: () => string | undefined) {
   async function request(path: string, init?: RequestInit): Promise<Response> {
     const token = getToken();
     const headers = new Headers(init?.headers);
-    headers.set("content-type", "application/json");
-    if (token) headers.set("authorization", `Bearer ${token}`);
+    headers.set(HEADER.CONTENT_TYPE, CONTENT_TYPE.JSON);
+    if (token) headers.set(HEADER.AUTHORIZATION, `${BEARER_PREFIX}${token}`);
     const response = await instrumentedFetch(`${BASE_URL}${path}`, { ...init, headers });
     if (!response.ok) {
       // エラー応答(Problem Details)から安定コード・trace_id を取り出して例外へ載せる。
@@ -99,12 +108,12 @@ export function createApiClient(getToken: () => string | undefined) {
       // span 粒度の相関は http.client.request(計装 fetch)が担保するため、ここは
       // ページトレースの trace_id 相関で足りる。属性は値があるときだけ付与する。
       const attributes: Record<string, unknown> = {
-        "http.response.status_code": error.status,
-        "url.path": path,
+        [ATTR.HTTP_RESPONSE_STATUS_CODE]: error.status,
+        [ATTR.URL_PATH]: path,
       };
-      if (error.code) attributes["flownote.error.code"] = error.code;
-      if (error.traceId) attributes["flownote.error.trace_id"] = error.traceId;
-      getClientLogger().error("web.api.error", attributes);
+      if (error.code) attributes[ATTR.FLOWNOTE_ERROR_CODE] = error.code;
+      if (error.traceId) attributes[ATTR.FLOWNOTE_ERROR_TRACE_ID] = error.traceId;
+      getClientLogger().error(WEB_EVENT.API_ERROR, attributes);
       throw error;
     }
     return response;
@@ -116,7 +125,7 @@ export function createApiClient(getToken: () => string | undefined) {
      * @returns メモ配列。
      */
     async listNotes(): Promise<Note[]> {
-      const response = await request("/api/notes");
+      const response = await request(API_ROUTES.NOTES);
       return (await response.json()) as Note[];
     },
     /**
@@ -125,8 +134,8 @@ export function createApiClient(getToken: () => string | undefined) {
      * @returns 作成されたメモ。
      */
     async createNote(input: { title: string; body: string }): Promise<Note> {
-      const response = await request("/api/notes", {
-        method: "POST",
+      const response = await request(API_ROUTES.NOTES, {
+        method: HTTP_METHOD.POST,
         body: JSON.stringify(input),
       });
       return (await response.json()) as Note;
@@ -137,8 +146,8 @@ export function createApiClient(getToken: () => string | undefined) {
      * @returns ヒット配列。
      */
     async search(query: string): Promise<SearchHit[]> {
-      const response = await request("/api/ai/search", {
-        method: "POST",
+      const response = await request(API_ROUTES.AI_SEARCH, {
+        method: HTTP_METHOD.POST,
         body: JSON.stringify({ query }),
       });
       const data = (await response.json()) as { hits: SearchHit[] };

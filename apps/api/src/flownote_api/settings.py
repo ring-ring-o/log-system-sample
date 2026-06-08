@@ -6,9 +6,45 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import StrEnum
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class RepoBackend(StrEnum):
+    """リポジトリ実装の選択。
+
+    Attributes:
+        SQL: SQLAlchemy。
+        MEMORY: インメモリ。
+    """
+
+    SQL = "sql"
+    MEMORY = "memory"
+
+
+class AiBackend(StrEnum):
+    """AI 実装の選択。
+
+    Attributes:
+        STUB: 開発用スタブ。
+        OPENAI: OpenAI 互換サーバ。
+    """
+
+    STUB = "stub"
+    OPENAI = "openai"
+
+
+class AuthMode(StrEnum):
+    """認証方式の選択。
+
+    Attributes:
+        DEV: 開発用(署名検証なし)。
+        OIDC: Keycloak(OIDC)。
+    """
+
+    DEV = "dev"
+    OIDC = "oidc"
 
 
 class Settings(BaseSettings):
@@ -37,15 +73,15 @@ class Settings(BaseSettings):
     service_version: str = "0.1.0"
 
     database_url: str = "sqlite+aiosqlite:///./.tmp/flownote.db"
-    repo_backend: Literal["sql", "memory"] = "sql"
+    repo_backend: RepoBackend = RepoBackend.SQL
 
-    ai_backend: Literal["stub", "openai"] = "stub"
+    ai_backend: AiBackend = AiBackend.STUB
     ai_base_url: str = "http://localhost:8001"
     ai_chat_model: str = "qwen2.5-instruct"
     ai_embedding_model: str = "qwen2.5-embed"
     ai_api_key: str | None = None
 
-    auth_mode: Literal["dev", "oidc"] = "dev"
+    auth_mode: AuthMode = AuthMode.DEV
     oidc_jwks_url: str = ""
     oidc_issuer: str = ""
     oidc_audience: str = "flownote-api"

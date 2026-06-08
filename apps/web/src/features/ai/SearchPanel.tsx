@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { type SearchHit, createApiClient } from "@/shared/api-client";
 import { getClientLogger } from "@/shared/observability";
+import { WEB_ACTION, WEB_ATTR, WEB_EVENT } from "@/shared/telemetry";
 import { useToken } from "@/shared/use-token";
 import { color, font, radius, space } from "@/tokens/tokens";
 
@@ -32,7 +33,9 @@ export function SearchPanel() {
   async function handleSearch(): Promise<void> {
     if (!query.trim()) return;
     // 操作イベントのみ記録(クエリ本文は載せない)。
-    getClientLogger().info("web.search.executed", { "flownote.web.action": "unified_search" });
+    getClientLogger().info(WEB_EVENT.SEARCH_EXECUTED, {
+      [WEB_ATTR.ACTION]: WEB_ACTION.UNIFIED_SEARCH,
+    });
     setHits(await api.search(query));
   }
 

@@ -35,39 +35,16 @@ import structlog
 from opentelemetry import trace
 from opentelemetry.trace import Span, StatusCode
 
+from flownote_observability.conventions import EventDomain
 from flownote_observability.logging_setup import get_logger
+from flownote_observability.semconv import EVENT_DOMAIN_KEY, KNOWN_NAMESPACES
 
 # span 属性として設定できる OTel の値型。これ以外(None/dict 等)は span には載せずログのみへ。
 type SpanAttributeValue = str | bool | int | float | Sequence[str]
 
 # 既知の(=既に名前空間が付いている)属性ルート。これらで始まるキーはそのまま尊重する。
-# それ以外(業務固有のキー)は衝突回避のため ``flownote.*`` に寄せる(規約 §4.2)。
-_KNOWN_NAMESPACES: frozenset[str] = frozenset(
-    {
-        "flownote",
-        "http",
-        "db",
-        "gen_ai",
-        "exception",
-        "code",
-        "user",
-        "service",
-        "deployment",
-        "event",
-        "network",
-        "client",
-        "server",
-        "url",
-        "error",
-        "audit",
-        "authz",
-        "security",
-        "session",
-        "rpc",
-        "messaging",
-        "mcp",
-    }
-)
+# それ以外(業務固有のキー)は衝突回避のため ``flownote.*`` に寄せる(規約 §4.2)。SSOT は semconv。
+_KNOWN_NAMESPACES: frozenset[str] = KNOWN_NAMESPACES
 
 
 def _namespaced(key: str) -> str:
@@ -139,7 +116,7 @@ class Operation:
 def operation(
     name: str,
     *,
-    domain: str = "app",
+    domain: str = EventDomain.APP,
     emit: bool = True,
     logger: structlog.stdlib.BoundLogger | None = None,
     tracer: trace.Tracer | None = None,
@@ -175,11 +152,11 @@ def operation(
             raise
         else:
             if emit:
-                bound = log.bind(**{"event.domain": domain, **op.attributes})
+                bound = log.bind(**{EVENT_DOMAIN_KEY: domain, **op.attributes})
                 bound.info(name)
 
 
-def log_event(name: str, *, domain: str = "app", **attributes: object) -> None:
+def log_event(name: str, *, domain: str = EventDomain.APP, **attributes: object) -> None:
     """span を張るほどでもない業務イベントを INFO で1件記録する。
 
     名前空間の正規化と ``event.domain`` 付与を肩代わりする薄いヘルパ。
@@ -191,4 +168,4 @@ def log_event(name: str, *, domain: str = "app", **attributes: object) -> None:
     """
     normalized = {_namespaced(key): value for key, value in attributes.items()}
     logger = get_logger("flownote_observability.operations")
-    logger.bind(**{"event.domain": domain, **normalized}).info(name)
+    logger.bind(**{EVENT_DOMAIN_KEY: domain, **normalized}).info(name)

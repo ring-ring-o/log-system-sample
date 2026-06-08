@@ -11,6 +11,8 @@ import hashlib
 
 import structlog
 
+from flownote_observability.semconv import USER_ID_KEY
+
 # セッションIDをそのまま出さないためのハッシュ短縮桁数([マスキング規約] §3.3)。
 _SESSION_HASH_LEN = 16
 
@@ -47,7 +49,7 @@ def bind_request_context(
     structlog.contextvars.bind_contextvars(request_id=request_id)
     if user_id is not None:
         # OTel セマンティック規約のキー名 ``user.id`` で束縛する。
-        structlog.contextvars.bind_contextvars(**{"user.id": user_id})
+        structlog.contextvars.bind_contextvars(**{USER_ID_KEY: user_id})
     if session_id is not None:
         structlog.contextvars.bind_contextvars(session_id=hash_session_id(session_id))
 

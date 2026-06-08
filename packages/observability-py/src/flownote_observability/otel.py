@@ -29,6 +29,11 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
 from flownote_observability.config import ObservabilityConfig
+from flownote_observability.semconv import (
+    DEPLOYMENT_ENVIRONMENT_KEY,
+    SERVICE_NAME_KEY,
+    SERVICE_VERSION_KEY,
+)
 
 
 def _build_resource(config: ObservabilityConfig) -> Resource:
@@ -42,10 +47,10 @@ def _build_resource(config: ObservabilityConfig) -> Resource:
     """
     return Resource.create(
         {
-            "service.name": config.service_name,
-            "service.version": config.service_version,
+            SERVICE_NAME_KEY: config.service_name,
+            SERVICE_VERSION_KEY: config.service_version,
             # OTel Stable: `deployment.environment` は `deployment.environment.name` に rename。
-            "deployment.environment.name": config.environment,
+            DEPLOYMENT_ENVIRONMENT_KEY: config.environment,
         }
     )
 

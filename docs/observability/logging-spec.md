@@ -141,6 +141,14 @@ OTel [Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/) に準
 - `body`（イベント名）と低カーディナリティ属性（method, status, route テンプレート）は**集計軸**。ID等の高カーディナリティ値は**属性値**として保持し、`body` には埋めない。
 - `http.route` は `/api/notes/{note_id}` のような**テンプレート**を用い、実IDは `flownote.note.id` に分離する。
 
+### 4.4 定数の SSOT（文字列リテラルの禁止）
+
+属性キー・イベント名・操作名・ルートパス・HTTP メソッド/ヘッダ等の**意味を持つ文字列はリテラルで散らさず、名前付き定数を経由**する（綴りの一意性＝規約契約。タイポと一括修正困難の防止）。**同じ文字列でも意図が異なれば別定数**とし、値はテストで固定する（`ChatRole.SYSTEM` と `gen_ai.system`、サーバ計測 `http.server.request.duration` とクライアント計測 `http.client.request.duration` 等）。
+
+- バックエンド: OTel/標準キーは `packages/observability-py` の `semconv.py`（`*_KEY`）、閉じた列挙値は `conventions.py`（`EventDomain`/`GenAiSystem` 等）。アプリ固有のイベント名/監査 action/`flownote.*` キーは `apps/api` の `flownote_api.shared`（`telemetry.py`/`http_constants.py`/`routes.py`）。
+- フロント: 共有キーは生成物 `@flownote/observability-web` の `ATTR`、FE ローカル値は `constants.ts`（`CLIENT_*`/`HEADER` 等）と `apps/web/src/shared/telemetry.ts`。
+- **FE/BE 一致が必要な値（ルートパス・共有属性キー）はバックエンドを SSOT に生成**する。コマンド `flownote-telemetry-catalog`（`--target routes|semconv` / `--check`）が `apps/web/src/shared/routes.generated.ts`（`API_ROUTES`）と `packages/observability-web/src/semconv.ts`（`ATTR`）を生成する。`pnpm --filter web check:telemetry` で追従漏れを CI 検知する（error-catalog と同方式）。
+
 ## 5. 例外・エラーログ
 
 `ERROR`/`FATAL` では以下を必須とする（OTel `exception.*`）。

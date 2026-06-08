@@ -10,7 +10,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from flownote_api.domain.ai import (
+    AIUseCase,
     ChatMessage,
+    ChatRole,
     ConsultResult,
     ProgressInsight,
     SearchDocument,
@@ -18,6 +20,12 @@ from flownote_api.domain.ai import (
 )
 from flownote_api.domain.tasks import Task, TaskStatus
 from flownote_observability import GenAIInstrumentation
+from flownote_observability.conventions import (
+    FinishReason,
+    GenAiContentKind,
+    GenAiOperation,
+    GenAiSystem,
+)
 
 # トークン数の粗い見積り係数(おおよそ4文字=1トークン)。
 _CHARS_PER_TOKEN = 4
@@ -62,21 +70,21 @@ class StubAIAssistant:
             定型の応答。
         """
         prompt = "\n".join(m.content for m in messages)
-        last_user = next((m.content for m in reversed(messages) if m.role == "user"), "")
+        last_user = next((m.content for m in reversed(messages) if m.role == ChatRole.USER), "")
         with self._genai.call(
-            operation="chat",
-            system="stub",
+            operation=GenAiOperation.CHAT,
+            system=GenAiSystem.STUB,
             request_model=self.model,
-            use_case="task_consult",
+            use_case=AIUseCase.TASK_CONSULT,
         ) as call:
             answer = f"ご相談の件「{last_user[:50]}」について、まず小さな次の一歩に分解しましょう。"
-            call.capture("prompt", prompt)
-            call.capture("completion", answer)
+            call.capture(GenAiContentKind.PROMPT, prompt)
+            call.capture(GenAiContentKind.COMPLETION, answer)
             call.record_usage(
                 input_tokens=_estimate_tokens(prompt),
                 output_tokens=_estimate_tokens(answer),
             )
-            call.record_response(model=self.model, finish_reasons=["stop"])
+            call.record_response(model=self.model, finish_reasons=[FinishReason.STOP])
             return ConsultResult(message=answer, model=self.model)
 
     async def search(self, query: str, documents: list[SearchDocument]) -> list[SearchHit]:
@@ -90,10 +98,10 @@ class StubAIAssistant:
             関連度降順の上位ヒット。
         """
         with self._genai.call(
-            operation="embeddings",
-            system="stub",
+            operation=GenAiOperation.EMBEDDINGS,
+            system=GenAiSystem.STUB,
             request_model=self.model,
-            use_case="unified_search",
+            use_case=AIUseCase.UNIFIED_SEARCH,
         ) as call:
             terms = {t for t in query.lower().split() if t}
             hits: list[SearchHit] = []
@@ -129,10 +137,10 @@ class StubAIAssistant:
         """
         now = datetime.now(UTC)
         with self._genai.call(
-            operation="chat",
-            system="stub",
+            operation=GenAiOperation.CHAT,
+            system=GenAiSystem.STUB,
             request_model=self.model,
-            use_case="progress_review",
+            use_case=AIUseCase.PROGRESS_REVIEW,
         ) as call:
             stalled = tuple(t.id for t in tasks if t.is_stalled(now=now))
             done = sum(1 for t in tasks if t.status is TaskStatus.DONE)
@@ -144,7 +152,7 @@ class StubAIAssistant:
             call.record_usage(
                 input_tokens=_estimate_tokens(summary), output_tokens=_estimate_tokens(summary)
             )
-            call.record_response(model=self.model, finish_reasons=["stop"])
+            call.record_response(model=self.model, finish_reasons=[FinishReason.STOP])
             return ProgressInsight(
                 summary=summary, stalled_task_ids=stalled, suggestions=suggestions
             )

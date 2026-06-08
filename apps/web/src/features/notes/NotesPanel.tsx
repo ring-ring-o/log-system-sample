@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { type Note, createApiClient } from "@/shared/api-client";
 import { getClientLogger } from "@/shared/observability";
+import { WEB_ACTION, WEB_ATTR, WEB_EVENT } from "@/shared/telemetry";
 import { useToken } from "@/shared/use-token";
 import { color, font, radius, space } from "@/tokens/tokens";
 
@@ -34,7 +35,7 @@ export function NotesPanel() {
       setError(null);
     } catch {
       setError("メモの取得に失敗しました");
-      getClientLogger().warn("web.notes.load_failed");
+      getClientLogger().warn(WEB_EVENT.NOTES_LOAD_FAILED);
     }
   }, [api]);
 
@@ -50,7 +51,7 @@ export function NotesPanel() {
     try {
       await api.createNote({ title, body: "" });
       // ユーザー操作イベント(本文は記録しない)。
-      getClientLogger().info("web.note.created", { "flownote.web.action": "create_note" });
+      getClientLogger().info(WEB_EVENT.NOTE_CREATED, { [WEB_ATTR.ACTION]: WEB_ACTION.CREATE_NOTE });
       setTitle("");
       await reload();
     } catch {
